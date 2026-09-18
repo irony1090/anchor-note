@@ -1,0 +1,47 @@
+{
+  "name": "note-map",
+  "displayName": "Note Map",
+  "description": "워크스페이스를 마인드맵으로 보고, 파일의 특정 라인에 계층형 메모를 붙인다",
+  "version": "0.0.1",
+  "publisher": "irony",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onWebviewPanel:noteMap.map"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "noteMap.openMap",
+        "title": "Open Map",
+        "category": "Note Map",
+        "icon": "$(type-hierarchy)"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production"
+  },
+  "devDependencies": {
+    "@types/d3-hierarchy": "^3.1.7",
+    "@types/d3-selection": "^3.0.12",
+    "@types/d3-zoom": "^3.0.8",
+    "@types/node": "^20.14.2",
+    "@types/vscode": "^1.85.0",
+    "d3-hierarchy": "^3.1.2",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.4.5"
+  }
+}
