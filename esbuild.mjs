@@ -19,8 +19,9 @@ const extensionConfig = {
 
 // 웹뷰는 브라우저에서 돌고 <script type="module">로 실려서 esm이어야 한다
 const webviewConfig = {
-  entryPoints: ["webview/main.ts"],
-  outfile: "dist/webview.js",
+  // webview.js = 맵, note-editor.js = 메모 에디터 (에디터 주도 프로토타입)
+  entryPoints: { webview: "webview/main.ts", "note-editor": "webview/note-editor.ts" },
+  outdir: "dist",
   bundle: true,
   platform: "browser",
   format: "esm",

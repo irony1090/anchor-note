@@ -16,12 +16,20 @@ export interface PreviewContent {
   more?: number;
 }
 
+/** 카드 아래 줄에 찍는 숫자. count는 라벨 합집합 크기다 (D15 라벨 단위 집계) */
+export interface NoteBadge {
+  count: number;
+  orphans: number;
+}
+
 export interface ExplorerHandlers {
   onNavigate(nodeId: string | null): void;
   onOpenFile(nodeId: string): void;
-  /** 카드에 띄울 메모 수. P3(메모 CRUD) 전까지는 undefined라 그 줄을 안 그린다 */
-  getNoteCount(node: TreeNode): number | undefined;
-  /** null이면 팝오버를 열지 않는다. P3(메모 CRUD) 전까지는 항상 null */
+  /** 파일 카드 선택. 메모 패널이 여기에 붙는다 (D10 카드는 메모부터) */
+  onSelectFile(node: TreeNode): void;
+  /** undefined면 메모 줄을 안 그린다 (트리가 없을 때) */
+  getNoteBadge(node: TreeNode): NoteBadge | undefined;
+  /** null이면 팝오버를 열지 않는다 */
   getPreview(node: TreeNode): PreviewContent | null;
 }
 
@@ -36,12 +44,13 @@ const PREVIEW_DELAY_MS = 350;
 export class Explorer {
   private tree: WorkspaceTree | null = null;
   private index: TreeIndex = new Map();
-  private view: ViewState = { cwdId: null, sortAsc: true };
+  private view: ViewState = { cwdId: null, sortAsc: true, noteFilter: "all" };
   private selectedId: string | null = null;
   private visible: TreeNode[] = [];
 
   private hoverTimer: number | undefined;
   private previewFor: string | null = null;
+  private previewAnchor: HTMLElement | null = null;
 
   constructor(
     private readonly el: ExplorerElements,
@@ -54,6 +63,12 @@ export class Explorer {
     this.el.cards.addEventListener("mouseover", (event) => this.onHover(event));
     this.el.cards.addEventListener("mouseleave", () => this.closePreview());
     this.el.breadcrumb.addEventListener("click", (event) => this.onBreadcrumbClick(event));
+    // B3: 팝오버를 띄운 채 창 크기를 바꾸면 좌표가 어긋난다. 앵커 카드를 기준으로 다시 앉힌다
+    window.addEventListener("resize", () => {
+      if (this.previewAnchor !== null && !this.el.preview.hidden) {
+        this.positionPreview(this.previewAnchor);
+      }
+    });
   }
 
   setTree(tree: WorkspaceTree | null): void {
@@ -157,7 +172,7 @@ export class Explorer {
     }
 
     const asc = this.view.sortAsc;
-    this.visible = [...(cwd.children ?? [])].sort((a, b) => {
+    this.visible = [...(cwd.children ?? [])].filter((node) => this.passesFilter(node)).sort((a, b) => {
       if (a.kind !== b.kind) {
         return a.kind === "folder" ? -1 : 1;
       }
@@ -167,13 +182,38 @@ export class Explorer {
     if (this.visible.length === 0) {
       const empty = document.createElement("p");
       empty.className = "empty";
-      empty.textContent = "이 폴더에 표시할 파일이 없습니다";
+      empty.textContent =
+        this.view.noteFilter === "all"
+          ? "이 폴더에 표시할 파일이 없습니다"
+          : "이 조건에 맞는 항목이 없습니다";
       this.el.cards.appendChild(empty);
       return;
     }
 
     for (const node of this.visible) {
       this.el.cards.appendChild(this.buildCard(node));
+    }
+  }
+
+  /** 폴더는 하위 전체의 합계로 판정한다. 메모가 있는 곳으로 내려가는 길이 필터에 잘리면 안 된다 */
+  private passesFilter(node: TreeNode): boolean {
+    const filter = this.view.noteFilter;
+    if (filter === "all") {
+      return true;
+    }
+    const badge = this.handlers.getNoteBadge(node);
+    if (badge === undefined) {
+      return true;
+    }
+    switch (filter) {
+      case "with":
+        return badge.count > 0;
+      case "without":
+        return badge.count === 0;
+      case "orphan":
+        return badge.orphans > 0;
+      default:
+        return true;
     }
   }
 
@@ -205,13 +245,19 @@ export class Explorer {
     }
     card.appendChild(meta);
 
-    // 메모 수 줄은 값이 있을 때만 그린다. P3(메모 CRUD) 전까지는 비어 있다
-    const count = this.handlers.getNoteCount(node);
-    if (count !== undefined) {
+    const badge = this.handlers.getNoteBadge(node);
+    if (badge !== undefined) {
       const notes = document.createElement("span");
       notes.className = "notes";
-      notes.textContent = count === 0 ? "no notes" : `${count} notes`;
+      notes.textContent = badge.count === 0 ? "no notes" : `${badge.count} notes`;
       card.appendChild(notes);
+
+      if (badge.orphans > 0) {
+        const orphans = document.createElement("span");
+        orphans.className = "orphans";
+        orphans.textContent = `${badge.orphans} orphan`;
+        card.appendChild(orphans);
+      }
     }
 
     return card;
@@ -238,7 +284,6 @@ export class Explorer {
       this.navigate(id);
       return;
     }
-    // 파일 클릭은 선택까지만. 메모 패널은 P3(메모 CRUD)에서 여기에 붙는다 (D10 카드는 메모부터)
     this.select(id);
   }
 
@@ -322,6 +367,24 @@ export class Explorer {
         card.scrollIntoView({ block: "nearest" });
       }
     }
+
+    const node = this.index.get(id)?.node;
+    if (node !== undefined && node.kind === "file") {
+      this.handlers.onSelectFile(node);
+    }
+  }
+
+  /** 패널이 닫히면 선택 표시도 지운다 */
+  clearSelection(): void {
+    this.selectedId = null;
+    for (const card of this.el.cards.querySelectorAll<HTMLElement>("button.card")) {
+      card.classList.remove("selected");
+    }
+  }
+
+  /** 카드 내용은 그대로지만 메모 수가 바뀌었을 때 */
+  refreshBadges(): void {
+    this.render();
   }
 
   // --- 프리뷰 팝오버 ---
@@ -360,6 +423,7 @@ export class Explorer {
     }
 
     this.previewFor = node.id;
+    this.previewAnchor = anchor;
     this.el.preview.replaceChildren();
 
     const title = document.createElement("p");
@@ -403,6 +467,7 @@ export class Explorer {
   private closePreview(): void {
     window.clearTimeout(this.hoverTimer);
     this.previewFor = null;
+    this.previewAnchor = null;
     this.el.preview.hidden = true;
   }
 

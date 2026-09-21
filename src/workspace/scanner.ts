@@ -1,14 +1,10 @@
 import * as vscode from "vscode";
+import { NOTES_DIR, VIRTUAL_ROOT_ID } from "../shared/protocol";
 import type { TreeNode, WorkspaceTree } from "../shared/protocol";
 import { compareNodes } from "../shared/tree";
 
 /** 이 수를 넘으면 잘라내고 truncated로 알린다. 실측 전 초안값 */
 const MAX_FILES = 20000;
-
-/** 메모 저장소가 맵에 파일로 또 나오면 혼란스러우므로 제외한다 (D8 마크다운 저장) */
-const NOTES_DIR = ".notemap";
-
-const VIRTUAL_ROOT_ID = "notemap:root";
 
 export async function scanWorkspace(token?: vscode.CancellationToken): Promise<WorkspaceTree | null> {
   const folders = vscode.workspace.workspaceFolders;
