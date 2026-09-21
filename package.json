@@ -1,85 +1,21 @@
 {
   "name": "note-map",
   "displayName": "Note Map",
-  "description": "워크스페이스를 마인드맵으로 보고, 파일의 특정 라인에 계층형 메모를 붙인다",
-  "version": "0.0.1",
+  "description": "소스 코드에 심은 마커(@note:라벨)에 마크다운 메모를 붙인다",
+  "version": "0.1.0",
   "publisher": "irony",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Visualization",
     "Other"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished",
-    "onWebviewPanel:noteMap.map"
+    "onStartupFinished"
   ],
-  "contributes": {
-    "configuration": {
-      "title": "Note Map",
-      "properties": {
-        "noteMap.markerPrefix": {
-          "type": "string",
-          "default": "@note:",
-          "description": "코드에 심는 마커의 앞부분. 바꾸면 기존 마커가 전부 끊긴다"
-        },
-        "noteMap.markerSuffix": {
-          "type": "string",
-          "default": "",
-          "description": "마커의 닫는 부분(선택). 비워두면 라벨이 공백에서 끝난다"
-        }
-      }
-    },
-    "commands": [
-      {
-        "command": "noteMap.openMap",
-        "title": "Open Map",
-        "category": "Note Map",
-        "icon": "$(type-hierarchy)"
-      },
-      {
-        "command": "noteMap.noteHere",
-        "title": "이 줄에 메모 (열기/만들기)",
-        "category": "Note Map"
-      },
-      {
-        "command": "noteMap.openNote",
-        "title": "메모 열기",
-        "category": "Note Map"
-      }
-    ],
-    "customEditors": [
-      {
-        "viewType": "noteMap.noteEditor",
-        "displayName": "Note Map 메모",
-        "selector": [
-          {
-            "filenamePattern": "**/.notemap/notes/*.md"
-          }
-        ],
-        "priority": "default"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "noteMap.noteHere",
-        "key": "ctrl+alt+m",
-        "mac": "cmd+alt+m",
-        "when": "editorTextFocus"
-      }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "noteMap.openNote",
-          "when": "false"
-        }
-      ]
-    }
-  },
+  "contributes": {},
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
@@ -87,18 +23,9 @@
     "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production"
   },
   "devDependencies": {
-    "@types/d3-hierarchy": "^3.1.7",
-    "@types/d3-selection": "^3.0.12",
-    "@types/d3-zoom": "^3.0.8",
     "@types/node": "^20.14.2",
     "@types/vscode": "^1.85.0",
-    "d3-hierarchy": "^3.1.2",
-    "d3-selection": "^3.0.0",
-    "d3-zoom": "^3.0.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.4.5"
-  },
-  "dependencies": {
-    "marked": "^18.0.13"
   }
 }

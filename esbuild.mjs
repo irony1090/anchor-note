@@ -17,10 +17,12 @@ const extensionConfig = {
   logLevel: "info",
 };
 
+// 웹뷰 entry는 첫 웹뷰를 만들 때 추가한다 (예: "note-editor": "webview/note-editor.ts")
+const webviewEntries = {};
+
 // 웹뷰는 브라우저에서 돌고 <script type="module">로 실려서 esm이어야 한다
 const webviewConfig = {
-  // webview.js = 맵, note-editor.js = 메모 에디터 (에디터 주도 프로토타입)
-  entryPoints: { webview: "webview/main.ts", "note-editor": "webview/note-editor.ts" },
+  entryPoints: webviewEntries,
   outdir: "dist",
   bundle: true,
   platform: "browser",
@@ -31,7 +33,8 @@ const webviewConfig = {
   logLevel: "info",
 };
 
-const configs = [extensionConfig, webviewConfig];
+const configs = [extensionConfig];
+if (Object.keys(webviewEntries).length > 0) configs.push(webviewConfig);
 
 if (watch) {
   const contexts = await Promise.all(configs.map((c) => esbuild.context(c)));

@@ -1,361 +1,222 @@
-/**
- * 노트 정본 (W1 노트 저장소). 디스크는 `.notemap/notes/{라벨}.md` 하나가 메모 하나다 (D8 마크다운 저장).
- * 라벨이 곧 파일명이므로 라벨 유일성은 파일시스템이 절반을 강제한다 (D12 라벨 전역 유일).
- */
-
 import * as vscode from "vscode";
-import { NOTES_DIR, isValidLabel } from "../shared/protocol";
-import type { Anchor, DeleteChildren, NoteKind, NoteMeta, NotesPatch } from "../shared/protocol";
-import { BrokenNoteError, parseNote, serializeNote } from "./frontmatter";
-import type { ParsedNote } from "./frontmatter";
+import { isValidLabel } from "../core/label";
+import { BrokenNoteError, bodyOffset, parseNote, serializeMeta, serializeNote } from "./frontmatter";
+import type { Anchor, NoteMeta } from "./frontmatter";
 
-const NOTES_SUBDIR = "notes";
+// 워크스페이스 첫 폴더 기준 (D8 마크다운 저장)
+export const NOTES_DIR = ".notemap/notes";
 const EXT = ".md";
 
-export interface NoteRecord extends NoteMeta {
+export interface Note {
+  label: string;
+  meta: NoteMeta;
+  // 디스크에 저장된 본문. 메모 에디터에서 저장 안 한 내용은 여기 없다
   body: string;
 }
 
-export interface CreateInput {
-  label: string;
-  title: string;
-  kind: NoteKind;
-  anchors: Anchor[];
-  parentLabel: string | null;
-  body?: string;
-  tags?: string[];
-}
-
-export interface UpdateInput {
-  title?: string;
-  body?: string;
-  tags?: string[];
-  anchors?: Anchor[];
-  parentLabel?: string | null;
-}
-
-/** 사용자에게 그대로 보여줄 수 있는 실패 */
+// 사용자에게 그대로 보여줄 수 있는 실패
 export class NoteStoreError extends Error {}
 
+// 노트 인덱스 (R2 노트 저장소). 디스크가 원본이고 이건 캐시다 — 바뀐 파일은 watcher가 reload로 다시 읽힌다
 export class NoteStore {
-  private readonly records = new Map<string, NoteRecord>();
-  /** 파싱이 깨진 파일. 건드리지 않고 이름만 들고 있는다 (REF-notes 3절 frontmatter 파손) */
-  private readonly broken = new Map<string, string>();
-  private extras = new Map<string, string[]>();
+  private readonly notes = new Map<string, Note>();
 
-  /** 다중 루트는 첫 폴더만 쓴다. 메모 저장소를 루트마다 두는 문제는 P7(다듬기)로 미뤘다 */
-  private get root(): vscode.Uri | null {
-    return vscode.workspace.workspaceFolders?.[0]?.uri ?? null;
-  }
-
+  // 다중 루트는 첫 폴더만 쓴다
   get dir(): vscode.Uri | null {
-    const root = this.root;
-    return root === null ? null : vscode.Uri.joinPath(root, NOTES_DIR, NOTES_SUBDIR);
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri;
+    return root === undefined ? null : vscode.Uri.joinPath(root, NOTES_DIR);
   }
 
-  metas(): NoteMeta[] {
-    return [...this.records.values()].map(toMeta);
+  uriOf(label: string): vscode.Uri | null {
+    const dir = this.dir;
+    return dir === null ? null : vscode.Uri.joinPath(dir, `${label}${EXT}`);
   }
 
-  get(label: string): NoteRecord | undefined {
-    return this.records.get(label);
+  // 저장소 폴더 바로 아래의 노트 파일이면 라벨. 하위 폴더나 다른 곳의 `.notemap`은 무시한다
+  labelOf(uri: vscode.Uri): string | null {
+    const dir = this.dir;
+    if (dir === null || uri.scheme !== dir.scheme || uri.authority !== dir.authority) {
+      return null;
+    }
+    const prefix = `${dir.path}/`;
+    const name = uri.path.startsWith(prefix) ? uri.path.slice(prefix.length) : "";
+    if (!name.endsWith(EXT) || name.includes("/")) {
+      return null;
+    }
+    const label = name.slice(0, -EXT.length);
+    return isValidLabel(label) ? label : null;
   }
 
-  brokenFiles(): Array<{ file: string; reason: string }> {
-    return [...this.broken].map(([file, reason]) => ({ file, reason }));
+  get(label: string): Note | undefined {
+    return this.notes.get(label);
   }
 
-  /** 활성화 시 한 번. 본문까지 메모리에 올린다 — 어차피 파일 하나를 통째로 읽는다 */
+  labels(): string[] {
+    return [...this.notes.keys()];
+  }
+
   async load(): Promise<void> {
-    this.records.clear();
-    this.broken.clear();
-    this.extras.clear();
-
+    this.notes.clear();
     const dir = this.dir;
     if (dir === null) {
       return;
     }
-
     let entries: Array<[string, vscode.FileType]>;
     try {
       entries = await vscode.workspace.fs.readDirectory(dir);
     } catch {
-      return; // 폴더가 아직 없다 = 메모가 없다
+      return; // 폴더가 없다 = 메모가 없다
     }
-
-    for (const [name, type] of entries) {
-      if (type === vscode.FileType.File && name.endsWith(EXT)) {
-        await this.readFile(vscode.Uri.joinPath(dir, name));
-      }
-    }
+    await Promise.all(
+      entries
+        .filter(([, type]) => type === vscode.FileType.File)
+        .map(([name]) => this.reload(vscode.Uri.joinPath(dir, name))),
+    );
   }
 
-  /** 외부(에디터·Obsidian·git)에서 바뀐 파일 하나를 다시 읽는다. W4에서 watcher가 부른다 */
-  async reload(uri: vscode.Uri): Promise<NotesPatch | null> {
-    const label = labelOf(uri);
-    if (label === null) {
-      return null;
-    }
-
-    const before = this.records.get(label);
-    await this.readFile(uri);
-    const after = this.records.get(label);
-
-    if (after === undefined) {
-      return before === undefined ? null : { upserted: [], removed: [label] };
-    }
-    return { upserted: [toMeta(after)], removed: [] };
-  }
-
-  /** watcher가 삭제를 알렸을 때 */
-  forget(uri: vscode.Uri): NotesPatch | null {
-    const label = labelOf(uri);
-    if (label === null || !this.records.delete(label)) {
-      return null;
-    }
-    this.extras.delete(label);
-    return { upserted: [], removed: [label] };
-  }
-
-  async create(input: CreateInput): Promise<NoteMeta> {
-    const label = input.label;
-    if (!isValidLabel(label)) {
-      throw new NoteStoreError(`라벨로 쓸 수 없다: "${label}"`);
-    }
-    if (this.records.has(label) || this.broken.has(`${label}${EXT}`)) {
-      throw new NoteStoreError(`이미 있는 라벨이다: "${label}"`);
-    }
-    if (input.parentLabel !== null && !this.records.has(input.parentLabel)) {
-      throw new NoteStoreError(`부모 메모가 없다: "${input.parentLabel}"`);
-    }
-
-    const now = new Date().toISOString();
-    const record: NoteRecord = {
-      label,
-      kind: input.kind,
-      anchors: input.anchors,
-      parentLabel: input.parentLabel,
-      title: input.title.trim() === "" ? label : input.title.trim(),
-      tags: input.tags ?? [],
-      createdAt: now,
-      updatedAt: now,
-      body: input.body ?? "",
-    };
-
-    this.records.set(label, record);
-    await this.write(record);
-    return toMeta(record);
-  }
-
-  async update(label: string, patch: UpdateInput): Promise<NoteMeta> {
-    const record = this.records.get(label);
-    if (record === undefined) {
-      throw new NoteStoreError(`없는 메모다: "${label}"`);
-    }
-
-    if (patch.parentLabel !== undefined && patch.parentLabel !== record.parentLabel) {
-      this.checkParent(label, patch.parentLabel);
-      record.parentLabel = patch.parentLabel;
-    }
-    if (patch.title !== undefined) {
-      record.title = patch.title.trim() === "" ? label : patch.title.trim();
-    }
-    if (patch.body !== undefined) {
-      record.body = patch.body;
-    }
-    if (patch.tags !== undefined) {
-      record.tags = patch.tags;
-    }
-    if (patch.anchors !== undefined) {
-      record.anchors = patch.anchors;
-    }
-
-    record.updatedAt = new Date().toISOString();
-    await this.write(record);
-    return toMeta(record);
-  }
-
-  /**
-   * 메모와 그 자식을 처리한다 (REF-notes 7절). 기본은 자식 승격.
-   * 소스에 박힌 마커를 지우는 것은 W7(마커 삽입)의 짝이라 여기서는 하지 않는다.
-   */
-  async remove(label: string, children: DeleteChildren): Promise<NotesPatch> {
-    const record = this.records.get(label);
-    if (record === undefined) {
-      throw new NoteStoreError(`없는 메모다: "${label}"`);
-    }
-
-    const removed: string[] = [];
-    const upserted: NoteMeta[] = [];
-
-    if (children === "delete") {
-      for (const victim of [label, ...this.descendants(label)]) {
-        await this.deleteFile(victim);
-        removed.push(victim);
-      }
-    } else {
-      for (const child of this.childrenOf(label)) {
-        child.parentLabel = record.parentLabel;
-        child.updatedAt = new Date().toISOString();
-        await this.write(child);
-        upserted.push(toMeta(child));
-      }
-      await this.deleteFile(label);
-      removed.push(label);
-    }
-
-    return { upserted, removed };
-  }
-
-  private childrenOf(label: string): NoteRecord[] {
-    return [...this.records.values()].filter((note) => note.parentLabel === label);
-  }
-
-  private descendants(label: string): string[] {
-    const out: string[] = [];
-    const queue = [label];
-    while (queue.length > 0) {
-      const current = queue.pop() as string;
-      for (const child of this.childrenOf(current)) {
-        out.push(child.label);
-        queue.push(child.label);
-      }
-    }
-    return out;
-  }
-
-  /** 새 부모가 자기 자신이거나 자기 자손이면 트리가 끊어진 고리가 된다 (REF-notes 7절 순환 금지) */
-  private checkParent(label: string, parentLabel: string | null): void {
-    if (parentLabel === null) {
-      return;
-    }
-    if (parentLabel === label) {
-      throw new NoteStoreError("자기 자신을 부모로 둘 수 없다");
-    }
-    if (!this.records.has(parentLabel)) {
-      throw new NoteStoreError(`부모 메모가 없다: "${parentLabel}"`);
-    }
-    if (this.descendants(label).includes(parentLabel)) {
-      throw new NoteStoreError("자기 자손을 부모로 둘 수 없다");
-    }
-  }
-
-  private async readFile(uri: vscode.Uri): Promise<void> {
-    const label = labelOf(uri);
+  // 파일 하나를 다시 읽는다. 없거나 깨졌으면 인덱스에서만 뺀다 — 깨진 파일은 고치지 않는다 (D20 서브셋 frontmatter 파서)
+  async reload(uri: vscode.Uri): Promise<void> {
+    const label = this.labelOf(uri);
     if (label === null) {
       return;
     }
-    const file = `${label}${EXT}`;
-
     let text: string;
     try {
-      text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+      text = await readText(uri);
     } catch {
-      this.records.delete(label);
-      this.broken.delete(file);
-      this.extras.delete(label);
+      this.notes.delete(label);
       return;
     }
-
     try {
-      const parsed = parseNote(text, label);
-      const now = new Date().toISOString();
-      this.records.set(label, {
-        label,
-        kind: parsed.kind,
-        anchors: parsed.anchors,
-        parentLabel: parsed.parentLabel,
-        title: parsed.title,
-        tags: parsed.tags,
-        createdAt: parsed.createdAt || now,
-        updatedAt: parsed.updatedAt || now,
-        body: parsed.body,
-      });
-      this.extras.set(label, parsed.extra);
-      this.broken.delete(file);
+      this.notes.set(label, { label, ...parseNote(text, label) });
     } catch (error) {
       if (!(error instanceof BrokenNoteError)) {
         throw error;
       }
-      // 고치지 않는다. 사람이 쓴 파일을 추측으로 되살리지 않는다 (orphan 정책과 같은 이유)
-      this.records.delete(label);
-      this.extras.delete(label);
-      this.broken.set(file, error.message);
+      this.notes.delete(label);
+      console.warn(`[note-map] ${label}${EXT} 건너뜀: ${error.message}`);
     }
   }
 
-  private async write(record: NoteRecord): Promise<void> {
-    const dir = this.dir;
-    if (dir === null) {
-      throw new NoteStoreError("워크스페이스가 열려 있지 않다");
+  forget(uri: vscode.Uri): void {
+    const label = this.labelOf(uri);
+    if (label !== null) {
+      this.notes.delete(label);
     }
-    await vscode.workspace.fs.createDirectory(dir);
+  }
 
-    const parsed: ParsedNote = {
-      kind: record.kind,
-      anchors: record.anchors,
-      parentLabel: record.parentLabel,
-      title: record.title,
-      tags: record.tags,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      body: record.body,
-      extra: this.extras.get(record.label) ?? [],
+  // 새 메모. 제목은 라벨과 같게 만든다
+  async create(label: string, anchor: Anchor | null): Promise<Note> {
+    if (!isValidLabel(label)) {
+      throw new NoteStoreError(`라벨로 쓸 수 없습니다: "${label}"`);
+    }
+    const dir = this.requireDir();
+    const uri = vscode.Uri.joinPath(dir, `${label}${EXT}`);
+    // 깨진 노트는 인덱스에 없으니 디스크로도 확인한다
+    if (this.notes.has(label) || (await exists(uri))) {
+      throw new NoteStoreError(`이미 노트 파일이 있습니다: ${label}${EXT}`);
+    }
+
+    const now = new Date().toISOString();
+    const note: Note = {
+      label,
+      meta: { kind: "marker", title: label, anchors: anchor === null ? [] : [anchor], created: now, updated: now, extra: [] },
+      body: "",
     };
-
-    await writeText(uriFor(dir, record.label), serializeNote(record.label, parsed));
+    await vscode.workspace.fs.createDirectory(dir);
+    await vscode.workspace.fs.writeFile(uri, encode(serializeNote(label, note)));
+    this.notes.set(label, note);
+    return note;
   }
 
-  private async deleteFile(label: string): Promise<void> {
+  // 이 경로 앵커가 없을 때만 덧붙인다. 앵커 단위 = (라벨, 경로) 쌍 하나 (D14 라벨 다중 앵커)
+  async addAnchor(label: string, anchor: Anchor): Promise<void> {
+    const note = this.require(label);
+    if (!note.meta.anchors.some((known) => known.path === anchor.path)) {
+      await this.writeMeta(label, { ...note.meta, anchors: [...note.meta.anchors, anchor] });
+    }
+  }
+
+  async setAnchors(label: string, anchors: Anchor[]): Promise<void> {
+    const note = this.require(label);
+    await this.writeMeta(label, { ...note.meta, anchors });
+  }
+
+  /**
+   * 노트 파일에 frontmatter만 다시 쓴다. 노트 파일 쓰기 통로는 이것 하나다 (새 메모 생성 제외).
+   * 열린 문서면 frontmatter 범위만 WorkspaceEdit로 바꾸고 본문은 건드리지 않는다 — 파일 전체를 다시 쓰면
+   * 메모 에디터에서 저장 안 한 본문이 디스크 본문으로 덮인다 (프로토타입의 덮어쓰기 버그).
+   * 편집 전에 dirty였으면 저장하지 않는다. 사용자가 저장 안 한 본문을 대신 확정하지 않으려는 것이다.
+   */
+  private async writeMeta(label: string, meta: NoteMeta): Promise<void> {
+    const uri = vscode.Uri.joinPath(this.requireDir(), `${label}${EXT}`);
+    const doc = vscode.workspace.textDocuments.find((open) => !open.isClosed && open.uri.toString() === uri.toString());
+
+    if (doc !== undefined) {
+      const start = bodyOffset(doc.getText());
+      if (start === null) {
+        throw brokenError(label);
+      }
+      const wasDirty = doc.isDirty;
+      const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(uri, new vscode.Range(doc.positionAt(0), doc.positionAt(start)), serializeMeta(label, meta, eol));
+      if (!(await vscode.workspace.applyEdit(edit))) {
+        throw new NoteStoreError(`노트를 고치지 못했습니다: ${label}${EXT}`);
+      }
+      if (!wasDirty) {
+        await doc.save();
+      }
+    } else {
+      const text = await readText(uri);
+      const start = bodyOffset(text);
+      if (start === null) {
+        throw brokenError(label);
+      }
+      const eol = text.includes("\r\n") ? "\r\n" : "\n";
+      await vscode.workspace.fs.writeFile(uri, encode(`${serializeMeta(label, meta, eol)}${text.slice(start)}`));
+    }
+
+    const note = this.notes.get(label);
+    if (note !== undefined) {
+      this.notes.set(label, { ...note, meta });
+    }
+  }
+
+  private require(label: string): Note {
+    const note = this.notes.get(label);
+    if (note === undefined) {
+      throw new NoteStoreError(`없는 메모입니다: "${label}"`);
+    }
+    return note;
+  }
+
+  private requireDir(): vscode.Uri {
     const dir = this.dir;
-    this.records.delete(label);
-    this.extras.delete(label);
     if (dir === null) {
-      return;
+      throw new NoteStoreError("워크스페이스 폴더가 열려 있지 않습니다");
     }
-    try {
-      await vscode.workspace.fs.delete(uriFor(dir, label));
-    } catch {
-      // 이미 없으면 그만이다
-    }
+    return dir;
   }
 }
 
-function uriFor(dir: vscode.Uri, label: string): vscode.Uri {
-  return vscode.Uri.joinPath(dir, `${label}${EXT}`);
+function brokenError(label: string): NoteStoreError {
+  return new NoteStoreError(`${label}${EXT}의 frontmatter가 깨져 있어 고치지 않았습니다. 텍스트 에디터로 열어 확인하세요`);
 }
 
-function labelOf(uri: vscode.Uri): string | null {
-  const name = uri.path.split("/").pop() ?? "";
-  if (!name.endsWith(EXT)) {
-    return null;
+async function readText(uri: vscode.Uri): Promise<string> {
+  return new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+}
+
+function encode(text: string): Uint8Array {
+  return new TextEncoder().encode(text);
+}
+
+async function exists(uri: vscode.Uri): Promise<boolean> {
+  try {
+    await vscode.workspace.fs.stat(uri);
+    return true;
+  } catch {
+    return false;
   }
-  const label = name.slice(0, -EXT.length);
-  return isValidLabel(label) ? label : null;
-}
-
-function toMeta(record: NoteRecord): NoteMeta {
-  const { body: _body, ...meta } = record;
-  return { ...meta, anchors: meta.anchors.map((anchor) => ({ ...anchor })) };
-}
-
-/**
- * 에디터에 열려 있는 파일은 `fs.writeFile`로 덮으면 사용자의 dirty 버퍼와 충돌한다.
- * 그 경우에만 WorkspaceEdit로 넣고 저장한다 (REF-architecture 8절).
- */
-async function writeText(uri: vscode.Uri, text: string): Promise<void> {
-  const open = vscode.workspace.textDocuments.find(
-    (doc) => doc.uri.toString() === uri.toString() && !doc.isClosed,
-  );
-
-  if (open === undefined) {
-    await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
-    return;
-  }
-
-  const edit = new vscode.WorkspaceEdit();
-  const whole = new vscode.Range(open.positionAt(0), open.positionAt(open.getText().length));
-  edit.replace(uri, whole, text);
-  await vscode.workspace.applyEdit(edit);
-  await open.save();
 }
