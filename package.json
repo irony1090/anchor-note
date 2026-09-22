@@ -58,6 +58,11 @@
         "command": "noteMap.deleteNote",
         "title": "메모 삭제",
         "category": "Note Map"
+      },
+      {
+        "command": "noteMap.findByTag",
+        "title": "태그로 메모 찾기",
+        "category": "Note Map"
       }
     ],
     "keybindings": [

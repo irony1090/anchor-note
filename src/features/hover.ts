@@ -28,8 +28,12 @@ export function registerHover(store: NoteStore): vscode.Disposable {
         } else {
           const args = commandArgs([hit.label]);
           md.appendMarkdown(
-            `**${escapeMd(note.meta.title)}** · [메모 열기](command:${OPEN_NOTE}?${args}) · [삭제](command:${DELETE_NOTE}?${args})\n\n---\n\n`,
+            `**${escapeMd(note.meta.title)}** · [메모 열기](command:${OPEN_NOTE}?${args}) · [삭제](command:${DELETE_NOTE}?${args})\n\n`,
           );
+          if (note.tags.length > 0) {
+            md.appendMarkdown(`${note.tags.map((tag) => `\`#${tag}\``).join(" ")}\n\n`);
+          }
+          md.appendMarkdown("---\n\n");
           md.appendMarkdown(note.body.trim() === "" ? "_(빈 메모)_" : note.body);
         }
         return new vscode.Hover(md, new vscode.Range(position.line, hit.start, position.line, hit.end));

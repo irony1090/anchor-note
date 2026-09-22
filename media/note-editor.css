@@ -193,3 +193,51 @@ body {
 #input:focus {
   border-top-color: var(--vscode-focusBorder);
 }
+
+/* --- 태그 (R8 태그) --- */
+
+#tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-badge-background);
+  font-size: 0.9em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tag:hover {
+  text-decoration: underline;
+}
+
+#tag-popup {
+  position: fixed;
+  z-index: 10;
+  min-width: 140px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+  color: var(--vscode-editorSuggestWidget-foreground);
+  background-color: var(--vscode-editorSuggestWidget-background);
+  border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-panel-border));
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+}
+
+#tag-popup li {
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+#tag-popup li.selected {
+  color: var(--vscode-editorSuggestWidget-selectedForeground, inherit);
+  background-color: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+}

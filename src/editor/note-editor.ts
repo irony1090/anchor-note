@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { DELETE_NOTE } from "../features/delete";
+import { FIND_BY_TAG } from "../features/tag-search";
 import { BrokenNoteError, bodyOffset, parseNote } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
 import { codeBlocks, reveal } from "./code-preview";
@@ -65,17 +66,25 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
       });
     };
 
+    const sendTags = () => post({ type: "tags", counts: [...this.store.tagCounts(label)] });
+
     const changeSub = vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document.uri.toString() === document.uri.toString() && ownEdits === 0) {
         sendDoc();
       }
     });
-    panel.onDidDispose(() => changeSub.dispose());
+    // 다른 메모가 저장되면 태그 후보가 바뀐다
+    const storeSub = this.store.onDidChange(sendTags);
+    panel.onDidDispose(() => {
+      changeSub.dispose();
+      storeSub.dispose();
+    });
 
     panel.webview.onDidReceiveMessage(async (message: EditorToHost) => {
       switch (message.type) {
         case "ready":
           sendDoc();
+          sendTags();
           return;
         case "edit":
           applyBody(message.body);
@@ -88,6 +97,9 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         case "delete":
           await vscode.commands.executeCommand(DELETE_NOTE, label);
+          return;
+        case "findTag":
+          await vscode.commands.executeCommand(FIND_BY_TAG, message.tag);
           return;
         default: {
           const unhandled: never = message;
@@ -131,6 +143,7 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
   <header id="head">
     <span id="title"></span>
     <span id="label"></span>
+    <span id="tags"></span>
     <span class="spacer"></span>
     <label class="toggle"><input type="checkbox" id="show-code"> 코드 보기</label>
     <button type="button" id="delete" title="메모 삭제">삭제</button>
@@ -138,7 +151,8 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
   <section id="code" hidden></section>
   <section id="preview"></section>
   <p id="error" hidden></p>
-  <textarea id="input" spellcheck="false" placeholder="마크다운으로 메모를 쓰세요. 저장은 Ctrl+S"></textarea>
+  <textarea id="input" spellcheck="false" placeholder="마크다운으로 메모를 쓰세요. #태그 · 저장은 Ctrl+S"></textarea>
+  <ul id="tag-popup" role="listbox" hidden></ul>
   <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
 </body>
 </html>`;

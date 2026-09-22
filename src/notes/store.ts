@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { isValidLabel } from "../core/label";
+import { tagsIn } from "../core/tag";
 import { BrokenNoteError, bodyOffset, parseNote, serializeMeta, serializeNote } from "./frontmatter";
 import type { Anchor, NoteMeta } from "./frontmatter";
 
@@ -12,6 +13,8 @@ export interface Note {
   meta: NoteMeta;
   // 디스크에 저장된 본문. 메모 에디터에서 저장 안 한 내용은 여기 없다
   body: string;
+  // 본문의 `#태그` (R8 태그). 목록을 따로 저장하지 않고 본문에서 계산한다
+  tags: string[];
 }
 
 // 사용자에게 그대로 보여줄 수 있는 실패
@@ -20,6 +23,13 @@ export class NoteStoreError extends Error {}
 // 노트 인덱스 (R2 노트 저장소). 디스크가 원본이고 이건 캐시다 — 바뀐 파일은 watcher가 reload로 다시 읽힌다
 export class NoteStore {
   private readonly notes = new Map<string, Note>();
+  private readonly changed = new vscode.EventEmitter<void>();
+  // 노트가 생기거나 바뀌거나 사라질 때. 열린 메모 에디터의 태그 목록 갱신, R9(둘러보기 페이지)가 쓴다
+  readonly onDidChange = this.changed.event;
+
+  dispose(): void {
+    this.changed.dispose();
+  }
 
   // 다중 루트는 첫 폴더만 쓴다
   get dir(): vscode.Uri | null {
@@ -84,16 +94,16 @@ export class NoteStore {
     try {
       text = await readText(uri);
     } catch {
-      this.notes.delete(label);
+      this.drop(label);
       return;
     }
     try {
-      this.notes.set(label, { label, ...parseNote(text, label) });
+      this.put({ label, ...parseNote(text, label) });
     } catch (error) {
       if (!(error instanceof BrokenNoteError)) {
         throw error;
       }
-      this.notes.delete(label);
+      this.drop(label);
       console.warn(`[note-map] ${label}${EXT} 건너뜀: ${error.message}`);
     }
   }
@@ -101,7 +111,7 @@ export class NoteStore {
   forget(uri: vscode.Uri): void {
     const label = this.labelOf(uri);
     if (label !== null) {
-      this.notes.delete(label);
+      this.drop(label);
     }
   }
 
@@ -118,15 +128,15 @@ export class NoteStore {
     }
 
     const now = new Date().toISOString();
-    const note: Note = {
+    const note: Omit<Note, "tags"> = {
       label,
       meta: { kind: "marker", title: label, anchors: anchor === null ? [] : [anchor], created: now, updated: now, extra: [] },
       body: "",
     };
     await vscode.workspace.fs.createDirectory(dir);
     await vscode.workspace.fs.writeFile(uri, encode(serializeNote(label, note)));
-    this.notes.set(label, note);
-    return note;
+    this.put(note);
+    return this.require(label);
   }
 
   /**
@@ -140,7 +150,7 @@ export class NoteStore {
     if (doc?.isDirty) {
       await doc.save();
     }
-    this.notes.delete(label);
+    this.drop(label);
     try {
       await vscode.workspace.fs.delete(uri, { useTrash: true });
     } catch {
@@ -203,7 +213,36 @@ export class NoteStore {
 
     const note = this.notes.get(label);
     if (note !== undefined) {
-      this.notes.set(label, { ...note, meta });
+      this.put({ ...note, meta });
+    }
+  }
+
+  // 태그 전체와 각 태그를 가진 메모 수. except 라벨은 뺀다 (메모 에디터가 저장 전 본문으로 자기 몫을 더한다)
+  tagCounts(except?: string): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const note of this.notes.values()) {
+      if (note.label !== except) {
+        for (const tag of note.tags) {
+          counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        }
+      }
+    }
+    return counts;
+  }
+
+  labelsWithTag(tag: string): string[] {
+    return [...this.notes.values()].filter((note) => note.tags.includes(tag)).map((note) => note.label);
+  }
+
+  // 인덱스 쓰기는 이 둘로만 한다. 태그 계산과 변경 이벤트를 빠뜨리지 않게
+  private put(note: Omit<Note, "tags">): void {
+    this.notes.set(note.label, { ...note, tags: tagsIn(note.body) });
+    this.changed.fire();
+  }
+
+  private drop(label: string): void {
+    if (this.notes.delete(label)) {
+      this.changed.fire();
     }
   }
 
