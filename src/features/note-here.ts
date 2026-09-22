@@ -17,8 +17,9 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
       void vscode.window.showErrorMessage(`없는 메모입니다: "${label}"`);
       return;
     }
+    // 이미 열린 탭이 있으면 그 그룹에서 보여준다. 늘 Beside로 열면 메모 에디터에서 부를 때 옆 그룹에 하나 더 생긴다
     await vscode.commands.executeCommand("vscode.openWith", uri, NOTE_EDITOR_VIEW_TYPE, {
-      viewColumn: vscode.ViewColumn.Beside,
+      viewColumn: noteColumn(uri) ?? vscode.ViewColumn.Beside,
       preview: false,
     });
   };
@@ -63,6 +64,14 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
   };
 
   return [vscode.commands.registerCommand(NOTE_HERE, noteHere), vscode.commands.registerCommand(OPEN_NOTE, openNote)];
+}
+
+// 이 노트를 메모 에디터로 연 탭이 있는 그룹
+export function noteColumn(uri: vscode.Uri): vscode.ViewColumn | undefined {
+  const target = uri.toString();
+  return vscode.window.tabGroups.all.find((group) =>
+    group.tabs.some((tab) => tab.input instanceof vscode.TabInputCustom && tab.input.uri.toString() === target),
+  )?.viewColumn;
 }
 
 // 앵커 경로는 첫 폴더 기준 상대경로만 (D8 마크다운 저장). 그 밖의 파일과 노트 파일 자신에는 붙이지 않는다

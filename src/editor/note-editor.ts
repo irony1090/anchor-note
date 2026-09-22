@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { DELETE_NOTE } from "../features/delete";
+import { RENAME_NOTE } from "../features/rename";
 import { FIND_BY_TAG } from "../features/tag-search";
 import { BrokenNoteError, bodyOffset, parseNote } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
@@ -112,6 +113,17 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
         case "delete":
           await vscode.commands.executeCommand(DELETE_NOTE, label);
           return;
+        case "rename":
+          await vscode.commands.executeCommand(RENAME_NOTE, label);
+          return;
+        case "setTitle":
+          try {
+            await this.store.setTitle(label, message.title);
+          } catch (error) {
+            void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
+            sendDoc(); // 입력칸에 남은 값을 원래 제목으로 되돌린다
+          }
+          return;
         case "findTag":
           await vscode.commands.executeCommand(FIND_BY_TAG, message.tag);
           return;
@@ -155,10 +167,11 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
 </head>
 <body>
   <header id="head">
-    <div class="head-part head-name"><span id="title"></span><span id="label"></span></div>
+    <div class="head-part head-name"><span id="title" title="클릭해서 제목 편집"></span><input id="title-input" type="text" hidden><span id="label"></span></div>
     <div class="head-part" id="tags"></div>
     <div class="head-part head-actions">
       <label class="toggle"><input type="checkbox" id="show-code"> 코드 보기</label>
+      <button type="button" id="rename" title="라벨 이름 바꾸기 (노트 파일과 모든 마커)">이름 변경</button>
       <button type="button" id="delete" title="메모 삭제">삭제</button>
     </div>
   </header>

@@ -51,6 +51,8 @@ const previewEl = byId<HTMLElement>("preview");
 const errorEl = byId<HTMLParagraphElement>("error");
 const input = byId<HTMLTextAreaElement>("input");
 const deleteButton = byId<HTMLButtonElement>("delete");
+const renameButton = byId<HTMLButtonElement>("rename");
+const titleInput = byId<HTMLInputElement>("title-input");
 const tagsEl = byId<HTMLDivElement>("tags");
 const tagComplete = new TagComplete(input, byId<HTMLUListElement>("tag-popup"));
 const splitCode = byId<HTMLDivElement>("split-code");
@@ -77,8 +79,39 @@ for (const el of [tagsEl, previewEl]) {
   });
 }
 
-// 확인창은 호스트가 띄운다
+// 확인창·입력창은 호스트가 띄운다
 deleteButton.addEventListener("click", () => api.postMessage({ type: "delete" }));
+renameButton.addEventListener("click", () => api.postMessage({ type: "rename" }));
+
+// 제목 편집: 제목을 누르면 같은 자리에 입력칸. Enter·포커스 이탈 = 저장, Esc = 취소. 비우면 호스트가 라벨로 되돌린다
+titleEl.addEventListener("click", () => {
+  titleInput.value = titleEl.textContent ?? "";
+  titleEl.hidden = true;
+  titleInput.hidden = false;
+  titleInput.focus();
+  titleInput.select();
+});
+titleInput.addEventListener("keydown", (event) => {
+  // 한글 조합 중의 Enter는 조합 확정이다
+  if (event.isComposing || event.keyCode === 229) {
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    titleInput.blur();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    titleInput.value = titleEl.textContent ?? "";
+    titleInput.blur();
+  }
+});
+titleInput.addEventListener("blur", () => {
+  titleInput.hidden = true;
+  titleEl.hidden = false;
+  if (titleInput.value !== titleEl.textContent) {
+    api.postMessage({ type: "setTitle", title: titleInput.value });
+  }
+});
 
 toggle.addEventListener("change", () => {
   api.setState({ showCode: toggle.checked });
@@ -98,6 +131,8 @@ window.addEventListener("message", (event: MessageEvent<HostToEditor>) => {
     case "doc":
       titleEl.textContent = message.title;
       labelEl.textContent = message.label;
+      // 제목이 라벨과 같으면 하나만 보인다
+      labelEl.hidden = message.title === message.label;
       input.readOnly = false;
       // 같은 값을 다시 넣으면 커서가 끝으로 튄다
       if (input.value !== message.body) {

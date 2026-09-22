@@ -163,6 +163,58 @@ export class NoteStore {
     }
   }
 
+  /**
+   * 라벨 이름 바꾸기. 파일 이름·frontmatter와 addEdits가 담는 편집(코드의 마커)을 **WorkspaceEdit 하나**로 적용한다 (틀리면 되돌리기가 어긋난다).
+   * 따로 적용하면 되돌리기 기록이 갈라져 Ctrl+Z가 한쪽만 되돌린다 -> 노트 `b.md`에 마커 `@note:a`로 어긋나고, R7 메모 삭제가 `b`를 사라진 노트로 본다.
+   * 하나로 묶으면 VSCode가 "모든 파일에서 되돌릴까요?"로 한 번에 되돌린다. 파일 이름을 WorkspaceEdit로 바꿔야 열린 탭도 VSCode가 옮기고
+   * onWillRenameFiles가 떠서 R7이 바깥 삭제로 보지 않는다 (workspace.fs.rename은 둘 다 안 한다).
+   */
+  async rename(from: string, to: string, addEdits?: (edit: vscode.WorkspaceEdit) => Promise<void>): Promise<void> {
+    const note = this.require(from);
+    if (!isValidLabel(to)) {
+      throw new NoteStoreError(`라벨로 쓸 수 없습니다: "${to}"`);
+    }
+    const dir = this.requireDir();
+    const source = vscode.Uri.joinPath(dir, `${from}${EXT}`);
+    const target = vscode.Uri.joinPath(dir, `${to}${EXT}`);
+    if (this.notes.has(to) || (await exists(target))) {
+      throw new NoteStoreError(`이미 있는 라벨입니다: ${to}`);
+    }
+
+    const doc = vscode.workspace.textDocuments.find((open) => !open.isClosed && open.uri.toString() === source.toString());
+    const text = doc?.getText() ?? (await readText(source));
+    const start = bodyOffset(text);
+    if (start === null) {
+      throw brokenError(from);
+    }
+    // 제목을 따로 정하지 않았으면(= 옛 라벨) 새 라벨을 따라간다
+    const meta = note.meta.title === from ? { ...note.meta, title: to } : note.meta;
+    const edit = new vscode.WorkspaceEdit();
+    edit.renameFile(source, target, { overwrite: false });
+    // 이름을 바꾼 파일의 frontmatter만 갈아 끼운다. 본문은 안 건드린다 (writeMeta와 같은 규칙)
+    edit.replace(target, new vscode.Range(new vscode.Position(0, 0), positionIn(text, start)), serializeMeta(to, meta, eolOf(text)));
+    await addEdits?.(edit);
+
+    const wasDirty = doc?.isDirty ?? false;
+    if (!(await vscode.workspace.applyEdit(edit))) {
+      throw new NoteStoreError(`노트 이름을 바꾸지 못했습니다: ${from}${EXT}`);
+    }
+    this.drop(from);
+    this.put({ ...note, label: to, meta });
+    if (!wasDirty) {
+      await (await vscode.workspace.openTextDocument(target)).save();
+    }
+  }
+
+  // 제목 편집. 한 줄로 만들고, 비우면 라벨로 되돌린다
+  async setTitle(label: string, title: string): Promise<void> {
+    const note = this.require(label);
+    const clean = title.replace(/\s+/g, " ").trim() || label;
+    if (clean !== note.meta.title) {
+      await this.writeMeta(label, { ...note.meta, title: clean });
+    }
+  }
+
   // 이 경로 앵커가 없을 때만 덧붙인다. 앵커 단위 = (라벨, 경로) 쌍 하나 (D14 라벨 다중 앵커)
   async addAnchor(label: string, anchor: Anchor): Promise<void> {
     const note = this.require(label);
@@ -265,6 +317,17 @@ export class NoteStore {
 
 function brokenError(label: string): NoteStoreError {
   return new NoteStoreError(`${label}${EXT}의 frontmatter가 깨져 있어 고치지 않았습니다. 텍스트 에디터로 열어 확인하세요`);
+}
+
+// 문자 위치 -> 줄·칸 (문서를 열지 않은 파일용)
+function positionIn(text: string, offset: number): vscode.Position {
+  const before = text.slice(0, offset);
+  const line = before.split("\n").length - 1;
+  return new vscode.Position(line, offset - (before.lastIndexOf("\n") + 1));
+}
+
+function eolOf(text: string): string {
+  return text.includes("\r\n") ? "\r\n" : "\n";
 }
 
 async function readText(uri: vscode.Uri): Promise<string> {

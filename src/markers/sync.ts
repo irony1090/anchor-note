@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { dropAnchors, labelsInLines, renameAnchors, rescanAnchors, samePaths, syncFileAnchors } from "../core/anchors";
+import { dropAnchors, labelsInLines, renameAnchors, rescanAnchors, sameAnchors, syncFileAnchors } from "../core/anchors";
 import type { Anchor } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
 import { markerPrefix } from "./edit";
@@ -84,7 +84,7 @@ async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken
     store,
     (label) => (anchors) => {
       const next = rescanAnchors(anchors, found.get(label) ?? new Map());
-      return samePaths(anchors, next) ? null : next;
+      return sameAnchors(anchors, next) ? null : next;
     },
     false,
   );

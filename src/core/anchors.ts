@@ -46,9 +46,11 @@ export function dropAnchors(anchors: Anchor[], path: string): Anchor[] | null {
   return kept.length === anchors.length ? null : kept;
 }
 
-// 전체 검색 결과(경로 -> 줄)에 맞춘다. 남는 앵커는 순서와 lineText를 유지하고, 새 앵커는 뒤에 붙인다
+// 전체 검색 결과(경로 -> 줄)에 맞춘다. 남는 앵커는 순서를 유지하고 lineText만 지금 줄로, 새 앵커는 뒤에 붙인다
 export function rescanAnchors(anchors: Anchor[], found: Map<string, string>): Anchor[] {
-  const kept = anchors.filter((anchor) => found.has(anchor.path));
+  const kept = anchors
+    .filter((anchor) => found.has(anchor.path))
+    .map((anchor) => ({ ...anchor, lineText: found.get(anchor.path) }));
   const added = [...found]
     .filter(([path]) => !kept.some((anchor) => anchor.path === path))
     .sort(([a], [b]) => a.localeCompare(b))
@@ -56,8 +58,8 @@ export function rescanAnchors(anchors: Anchor[], found: Map<string, string>): An
   return [...kept, ...added];
 }
 
-export function samePaths(a: Anchor[], b: Anchor[]): boolean {
-  return a.length === b.length && a.every((anchor, i) => anchor.path === b[i].path);
+export function sameAnchors(a: Anchor[], b: Anchor[]): boolean {
+  return a.length === b.length && a.every((anchor, i) => anchor.path === b[i].path && anchor.lineText === b[i].lineText);
 }
 
 // path가 dir 자신이거나 그 아래

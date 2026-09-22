@@ -63,6 +63,11 @@
         "command": "noteMap.findByTag",
         "title": "태그로 메모 찾기",
         "category": "Note Map"
+      },
+      {
+        "command": "noteMap.renameNote",
+        "title": "라벨 이름 바꾸기",
+        "category": "Note Map"
       }
     ],
     "keybindings": [

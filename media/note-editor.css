@@ -59,6 +59,25 @@ body {
   text-overflow: ellipsis;
 }
 
+#title {
+  cursor: text;
+}
+
+#title:hover {
+  text-decoration: underline dotted;
+}
+
+#title-input {
+  min-width: 8em;
+  padding: 1px 4px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-focusBorder);
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+}
+
 #label {
   color: var(--vscode-descriptionForeground);
   font-family: var(--vscode-editor-font-family);
@@ -78,6 +97,7 @@ body {
   color: var(--vscode-descriptionForeground);
 }
 
+#rename,
 #delete {
   background: none;
   border: 1px solid var(--vscode-panel-border);
@@ -86,6 +106,11 @@ body {
   color: var(--vscode-descriptionForeground);
   font: inherit;
   cursor: pointer;
+}
+
+#rename:hover {
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-focusBorder);
 }
 
 #delete:hover {

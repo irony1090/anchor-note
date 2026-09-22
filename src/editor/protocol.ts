@@ -31,5 +31,7 @@ export type EditorToHost =
   | { type: "requestCode" }
   | { type: "reveal"; path: string; line: number }
   | { type: "delete" }
+  | { type: "rename" }
+  | { type: "setTitle"; title: string }
   | { type: "findTag"; tag: string }
   | { type: "layout"; layout: Layout };

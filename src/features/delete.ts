@@ -34,7 +34,7 @@ export function registerDelete(store: NoteStore): DeleteFeature {
 
   const deleteNote = async (labelArg?: unknown) => {
     try {
-      const label = typeof labelArg === "string" ? labelArg : (activeNoteLabel(store) ?? (await pickNote(store)));
+      const label = typeof labelArg === "string" ? labelArg : (activeNoteLabel(store) ?? (await pickNote(store, "삭제할 메모")));
       if (label === undefined || store.get(label) === undefined) {
         return;
       }
@@ -150,26 +150,26 @@ function uniqueFiles(hits: MarkerLocation[]): vscode.Uri[] {
 }
 
 // 활성 탭이 노트면 그 라벨 (메모 에디터든 텍스트 에디터든)
-function activeNoteLabel(store: NoteStore): string | undefined {
+export function activeNoteLabel(store: NoteStore): string | undefined {
   const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
   const uri = input instanceof vscode.TabInputCustom || input instanceof vscode.TabInputText ? input.uri : undefined;
   return uri === undefined ? undefined : (store.labelOf(uri) ?? undefined);
 }
 
-async function pickNote(store: NoteStore): Promise<string | undefined> {
+export async function pickNote(store: NoteStore, title: string): Promise<string | undefined> {
   const items = store
     .labels()
     .sort((a, b) => a.localeCompare(b))
     .map((label) => {
-      const title = store.get(label)?.meta.title ?? label;
-      return { label, description: title === label ? undefined : title };
+      const noteTitle = store.get(label)?.meta.title ?? label;
+      return { label, description: noteTitle === label ? undefined : noteTitle };
     });
-  const picked = await vscode.window.showQuickPick(items, { title: "삭제할 메모", matchOnDescription: true });
+  const picked = await vscode.window.showQuickPick(items, { title, matchOnDescription: true });
   return picked?.label;
 }
 
-// 지운 노트를 연 탭을 닫는다. 저장부터 하고 지웠으니 dirty 확인창은 안 뜬다
-async function closeTabs(uri: vscode.Uri): Promise<void> {
+// 그 노트를 연 탭을 닫는다 (메모 에디터·텍스트 에디터)
+export async function closeTabs(uri: vscode.Uri): Promise<void> {
   const target = uri.toString();
   const tabs = vscode.window.tabGroups.all
     .flatMap((group) => group.tabs)
