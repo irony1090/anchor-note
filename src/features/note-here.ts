@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { isValidLabel, toLabel } from "../core/label";
 import { markerText, markersIn } from "../core/marker";
 import type { MarkerHit } from "../core/marker";
+import { NOTE_EDITOR_VIEW_TYPE } from "../editor/note-editor";
 import { insertMarker, markerPrefix } from "../markers/edit";
 import type { NoteStore } from "../notes/store";
 
@@ -16,8 +17,10 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
       void vscode.window.showErrorMessage(`없는 메모입니다: "${label}"`);
       return;
     }
-    // R4(메모 에디터) 전까지는 일반 텍스트 에디터로 연다
-    await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+    await vscode.commands.executeCommand("vscode.openWith", uri, NOTE_EDITOR_VIEW_TYPE, {
+      viewColumn: vscode.ViewColumn.Beside,
+      preview: false,
+    });
   };
 
   // hover [메모 만들기]는 (uri, line, character)를 넘긴다. 단축키·커맨드 팔레트는 인자 없이 부른다

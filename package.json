@@ -26,6 +26,18 @@
         }
       }
     },
+    "customEditors": [
+      {
+        "viewType": "noteMap.noteEditor",
+        "displayName": "Note Map 메모",
+        "selector": [
+          {
+            "filenamePattern": "**/.notemap/notes/*.md"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "commands": [
       {
         "command": "noteMap.noteHere",
@@ -66,5 +78,8 @@
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "marked": "^18.0.13"
   }
 }
