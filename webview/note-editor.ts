@@ -22,6 +22,7 @@ const codeEl = byId<HTMLElement>("code");
 const previewEl = byId<HTMLElement>("preview");
 const errorEl = byId<HTMLParagraphElement>("error");
 const input = byId<HTMLTextAreaElement>("input");
+const deleteButton = byId<HTMLButtonElement>("delete");
 
 const saved = api.getState() as { showCode?: boolean } | undefined;
 toggle.checked = saved?.showCode === true;
@@ -30,6 +31,9 @@ input.addEventListener("input", () => {
   renderPreview(input.value);
   api.postMessage({ type: "edit", body: input.value });
 });
+
+// 확인창은 호스트가 띄운다
+deleteButton.addEventListener("click", () => api.postMessage({ type: "delete" }));
 
 toggle.addEventListener("change", () => {
   api.setState({ showCode: toggle.checked });

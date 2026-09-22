@@ -129,6 +129,30 @@ export class NoteStore {
     return note;
   }
 
+  /**
+   * 노트 파일을 지운다 (R7 메모 삭제). 인덱스에서 먼저 빼서, 뒤따르는 마커 삭제의 저장이 R5(마커 스캔)로 이 노트를 다시 쓰지 않게 한다.
+   * 열린 문서가 dirty면 저장부터 한다 — dirty 탭을 닫으면 저장 여부를 묻고, 거기서 저장을 고르면 지운 파일이 되살아난다.
+   */
+  async delete(label: string): Promise<void> {
+    this.require(label);
+    const uri = vscode.Uri.joinPath(this.requireDir(), `${label}${EXT}`);
+    const doc = vscode.workspace.textDocuments.find((open) => !open.isClosed && open.uri.toString() === uri.toString());
+    if (doc?.isDirty) {
+      await doc.save();
+    }
+    this.notes.delete(label);
+    try {
+      await vscode.workspace.fs.delete(uri, { useTrash: true });
+    } catch {
+      try {
+        await vscode.workspace.fs.delete(uri, { useTrash: false }); // 휴지통이 없는 파일시스템
+      } catch (error) {
+        await this.reload(uri);
+        throw new NoteStoreError(`노트 파일을 지우지 못했습니다: ${label}${EXT} (${error instanceof Error ? error.message : error})`);
+      }
+    }
+  }
+
   // 이 경로 앵커가 없을 때만 덧붙인다. 앵커 단위 = (라벨, 경로) 쌍 하나 (D14 라벨 다중 앵커)
   async addAnchor(label: string, anchor: Anchor): Promise<void> {
     const note = this.require(label);

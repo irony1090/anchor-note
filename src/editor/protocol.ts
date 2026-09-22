@@ -19,4 +19,5 @@ export type EditorToHost =
   | { type: "ready" }
   | { type: "edit"; body: string }
   | { type: "requestCode" }
-  | { type: "reveal"; path: string; line: number };
+  | { type: "reveal"; path: string; line: number }
+  | { type: "delete" };

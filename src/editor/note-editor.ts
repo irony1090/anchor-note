@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { DELETE_NOTE } from "../features/delete";
 import { BrokenNoteError, bodyOffset, parseNote } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
 import { codeBlocks, reveal } from "./code-preview";
@@ -85,6 +86,9 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
         case "reveal":
           await reveal(message.path, message.line, panel.viewColumn);
           return;
+        case "delete":
+          await vscode.commands.executeCommand(DELETE_NOTE, label);
+          return;
         default: {
           const unhandled: never = message;
           console.error("[note-map] unhandled editor message", unhandled);
@@ -129,6 +133,7 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
     <span id="label"></span>
     <span class="spacer"></span>
     <label class="toggle"><input type="checkbox" id="show-code"> 코드 보기</label>
+    <button type="button" id="delete" title="메모 삭제">삭제</button>
   </header>
   <section id="code" hidden></section>
   <section id="preview"></section>
