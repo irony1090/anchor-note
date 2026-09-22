@@ -48,6 +48,11 @@
         "command": "noteMap.openNote",
         "title": "메모 열기",
         "category": "Note Map"
+      },
+      {
+        "command": "noteMap.rescan",
+        "title": "마커 다시 찾기 (Rescan Workspace)",
+        "category": "Note Map"
       }
     ],
     "keybindings": [
