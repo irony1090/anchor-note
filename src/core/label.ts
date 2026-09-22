@@ -6,6 +6,11 @@ export function isValidLabel(label: string): boolean {
   return label !== "" && !label.endsWith(".") && !LABEL_FORBIDDEN.test(label);
 }
 
+// 라벨에 들어갈 수 있는 글자로만 됐는지. 쓰다 만 라벨(빈 문자열, 끝 마침표)도 통과한다
+export function isLabelChars(text: string): boolean {
+  return !LABEL_FORBIDDEN.test(text);
+}
+
 // 입력값의 공백 덩어리를 `_` 하나로 (D22 라벨 공백 금지)
 export function toLabel(input: string): string {
   return input.trim().replace(/\s+/g, "_");

@@ -1,4 +1,4 @@
-import { isValidLabel } from "./label";
+import { isLabelChars, isValidLabel } from "./label";
 
 export interface MarkerHit {
   label: string;
@@ -28,6 +28,23 @@ export function markersIn(line: string, prefix: string): MarkerHit[] {
     }
   }
   return hits;
+}
+
+export interface PartialMarker {
+  // 라벨 일부가 시작하는 위치 (prefix 바로 뒤)
+  start: number;
+  partial: string;
+}
+
+// 커서 앞 텍스트가 `prefix + 라벨 일부`로 끝나면 그 일부. 자동완성(R6)이 쓴다. 경계 규칙은 markersIn과 같다(앞쪽 경계 없음)
+export function partialMarkerAt(before: string, prefix: string): PartialMarker | null {
+  const at = before.lastIndexOf(prefix);
+  if (at === -1) {
+    return null;
+  }
+  const start = at + prefix.length;
+  const partial = before.slice(start);
+  return isLabelChars(partial) ? { start, partial } : null;
 }
 
 function escapeRegExp(text: string): string {

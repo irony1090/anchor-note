@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import { NoteEditorProvider } from "./editor/note-editor";
+import { registerCompletion } from "./features/completion";
 import { registerHover } from "./features/hover";
 import { registerNoteHere } from "./features/note-here";
 import { registerSync } from "./markers/sync";
@@ -11,7 +12,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const store = new NoteStore();
   // watcher를 load보다 먼저 붙인다. 읽는 사이에 바뀐 파일을 놓치지 않게
   context.subscriptions.push(watchNotes(store), stampOnSave(store));
-  context.subscriptions.push(...registerNoteHere(store), registerHover(store));
+  context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store));
   context.subscriptions.push(NoteEditorProvider.register(context.extensionUri, store), ...registerSync(store));
   void store.load().then(() => console.log(`[note-map] activated, ${store.labels().length} notes`));
 }
