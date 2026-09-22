@@ -3,6 +3,7 @@
 import { marked } from "marked";
 import { tagSpans, tagsIn } from "../src/core/tag";
 import type { CodeBlock, EditorToHost, HostToEditor } from "../src/editor/protocol";
+import { Splitters } from "./splitters";
 import { TagComplete } from "./tag-complete";
 
 interface VsCodeApi {
@@ -50,8 +51,12 @@ const previewEl = byId<HTMLElement>("preview");
 const errorEl = byId<HTMLParagraphElement>("error");
 const input = byId<HTMLTextAreaElement>("input");
 const deleteButton = byId<HTMLButtonElement>("delete");
-const tagsEl = byId<HTMLSpanElement>("tags");
+const tagsEl = byId<HTMLDivElement>("tags");
 const tagComplete = new TagComplete(input, byId<HTMLUListElement>("tag-popup"));
+const splitCode = byId<HTMLDivElement>("split-code");
+const splitters = new Splitters({ code: codeEl, preview: previewEl, input }, (layout) =>
+  api.postMessage({ type: "layout", layout }),
+);
 
 const saved = api.getState() as { showCode?: boolean } | undefined;
 toggle.checked = saved?.showCode === true;
@@ -112,6 +117,9 @@ window.addEventListener("message", (event: MessageEvent<HostToEditor>) => {
     case "tags":
       tagComplete.setOthers(message.counts);
       return;
+    case "layout":
+      splitters.apply(message.layout);
+      return;
     default: {
       const unhandled: never = message;
       console.error("[note-map] unhandled host message", unhandled);
@@ -124,6 +132,8 @@ syncCode();
 
 function syncCode(): void {
   codeEl.hidden = !toggle.checked;
+  splitCode.hidden = !toggle.checked;
+  splitters.setCodeVisible(toggle.checked);
   if (toggle.checked) {
     api.postMessage({ type: "requestCode" });
   }

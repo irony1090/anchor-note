@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const deletion = registerDelete(store);
   context.subscriptions.push(watchNotes(store, deletion.onNoteDeleted), stampOnSave(store), ...deletion.disposables);
   context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store));
-  context.subscriptions.push(NoteEditorProvider.register(context.extensionUri, store), ...registerSync(store));
+  context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store));
   void store.load().then(() => console.log(`[note-map] activated, ${store.labels().length} notes`));
 }
 

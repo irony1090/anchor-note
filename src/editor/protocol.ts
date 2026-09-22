@@ -10,12 +10,20 @@ export interface CodeBlock {
   missing?: string;
 }
 
+// 세 영역의 flex 가중치. 픽셀이 아니라 비율이라 창 크기가 달라도 같게 보인다
+export interface Layout {
+  code: number;
+  preview: number;
+  input: number;
+}
+
 export type HostToEditor =
   | { type: "doc"; label: string; title: string; body: string }
   | { type: "code"; blocks: CodeBlock[] }
   | { type: "error"; message: string }
   // 이 메모를 뺀 태그별 메모 수 (R8 태그). 웹뷰가 지금 본문의 태그를 더한다
-  | { type: "tags"; counts: Array<[string, number]> };
+  | { type: "tags"; counts: Array<[string, number]> }
+  | { type: "layout"; layout: Layout };
 
 export type EditorToHost =
   | { type: "ready" }
@@ -23,4 +31,5 @@ export type EditorToHost =
   | { type: "requestCode" }
   | { type: "reveal"; path: string; line: number }
   | { type: "delete" }
-  | { type: "findTag"; tag: string };
+  | { type: "findTag"; tag: string }
+  | { type: "layout"; layout: Layout };

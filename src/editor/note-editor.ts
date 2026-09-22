@@ -4,20 +4,26 @@ import { FIND_BY_TAG } from "../features/tag-search";
 import { BrokenNoteError, bodyOffset, parseNote } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
 import { codeBlocks, reveal } from "./code-preview";
-import type { EditorToHost, HostToEditor } from "./protocol";
+import type { EditorToHost, HostToEditor, Layout } from "./protocol";
 
 export const NOTE_EDITOR_VIEW_TYPE = "noteMap.noteEditor";
+// 영역 크기 비율. 워크스페이스가 아니라 전역에 둔다 — 새로 여는 모든 메모에 같은 배치
+const LAYOUT_KEY = "noteMap.editorLayout";
 
 const BROKEN = "frontmatter가 깨져 본문을 고칠 수 없습니다. 텍스트 에디터로 여세요 (Reopen Editor With > Text Editor)";
 
 // 노트 `.md` 전용 CustomTextEditor (R4 메모 에디터). 원본은 TextDocument라 저장·dirty 표시·되돌리기는 VSCode가 한다
 export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
-  static register(extensionUri: vscode.Uri, store: NoteStore): vscode.Disposable {
-    return vscode.window.registerCustomEditorProvider(NOTE_EDITOR_VIEW_TYPE, new NoteEditorProvider(extensionUri, store));
+  static register(context: vscode.ExtensionContext, store: NoteStore): vscode.Disposable {
+    return vscode.window.registerCustomEditorProvider(
+      NOTE_EDITOR_VIEW_TYPE,
+      new NoteEditorProvider(context.extensionUri, context.globalState, store),
+    );
   }
 
   private constructor(
     private readonly extensionUri: vscode.Uri,
+    private readonly globalState: vscode.Memento,
     private readonly store: NoteStore,
   ) {}
 
@@ -82,9 +88,17 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
 
     panel.webview.onDidReceiveMessage(async (message: EditorToHost) => {
       switch (message.type) {
-        case "ready":
+        case "ready": {
+          const layout = this.globalState.get<Layout>(LAYOUT_KEY);
+          if (layout !== undefined) {
+            post({ type: "layout", layout });
+          }
           sendDoc();
           sendTags();
+          return;
+        }
+        case "layout":
+          await this.globalState.update(LAYOUT_KEY, message.layout);
           return;
         case "edit":
           applyBody(message.body);
@@ -141,16 +155,18 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
 </head>
 <body>
   <header id="head">
-    <span id="title"></span>
-    <span id="label"></span>
-    <span id="tags"></span>
-    <span class="spacer"></span>
-    <label class="toggle"><input type="checkbox" id="show-code"> 코드 보기</label>
-    <button type="button" id="delete" title="메모 삭제">삭제</button>
+    <div class="head-part head-name"><span id="title"></span><span id="label"></span></div>
+    <div class="head-part" id="tags"></div>
+    <div class="head-part head-actions">
+      <label class="toggle"><input type="checkbox" id="show-code"> 코드 보기</label>
+      <button type="button" id="delete" title="메모 삭제">삭제</button>
+    </div>
   </header>
-  <section id="code" hidden></section>
-  <section id="preview"></section>
   <p id="error" hidden></p>
+  <section id="code" hidden></section>
+  <div class="splitter" id="split-code" data-between="code,preview" title="드래그로 크기 조절 · 더블클릭으로 기본값" hidden></div>
+  <section id="preview"></section>
+  <div class="splitter" id="split-input" data-between="preview,input" title="드래그로 크기 조절 · 더블클릭으로 기본값"></div>
   <textarea id="input" spellcheck="false" placeholder="마크다운으로 메모를 쓰세요. #태그 · 저장은 Ctrl+S"></textarea>
   <ul id="tag-popup" role="listbox" hidden></ul>
   <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
