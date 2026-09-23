@@ -7,9 +7,9 @@ import type { NoteStore } from "../notes/store";
 import { codeBlocks, reveal } from "./code-preview";
 import type { EditorToHost, HostToEditor, Layout } from "./protocol";
 
-export const NOTE_EDITOR_VIEW_TYPE = "noteMap.noteEditor";
+export const NOTE_EDITOR_VIEW_TYPE = "anchorNotes.noteEditor";
 // 영역 크기 비율. 워크스페이스가 아니라 전역에 둔다 — 새로 여는 모든 메모에 같은 배치
-const LAYOUT_KEY = "noteMap.editorLayout";
+const LAYOUT_KEY = "anchorNotes.editorLayout";
 
 const BROKEN = "frontmatter가 깨져 본문을 고칠 수 없습니다. 텍스트 에디터로 여세요 (Reopen Editor With > Text Editor)";
 
@@ -129,7 +129,7 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         default: {
           const unhandled: never = message;
-          console.error("[note-map] unhandled editor message", unhandled);
+          console.error("[anchor-notes] unhandled editor message", unhandled);
         }
       }
     });

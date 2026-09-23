@@ -5,7 +5,7 @@ import type { MarkerHit } from "../core/marker";
 
 // 설정의 prefix. 비었거나 공백이 있으면 마커가 성립하지 않아 기본값을 쓴다
 export function markerPrefix(): string {
-  const prefix = vscode.workspace.getConfiguration("noteMap").get<string>("markerPrefix", DEFAULT_PREFIX);
+  const prefix = vscode.workspace.getConfiguration("anchorNotes").get<string>("markerPrefix", DEFAULT_PREFIX);
   return prefix === "" || /\s/.test(prefix) ? DEFAULT_PREFIX : prefix;
 }
 

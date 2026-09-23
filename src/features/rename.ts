@@ -7,7 +7,7 @@ import type { NoteStore } from "../notes/store";
 import { activeNoteLabel, pickNote } from "./delete";
 import { OPEN_NOTE, noteColumn } from "./note-here";
 
-export const RENAME_NOTE = "noteMap.renameNote";
+export const RENAME_NOTE = "anchorNotes.renameNote";
 
 // 라벨 이름 바꾸기: 노트 파일·frontmatter·코드의 모든 마커를 한 번에 (근거는 NoteStore.rename)
 export function registerRename(store: NoteStore): vscode.Disposable {

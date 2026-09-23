@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(watchNotes(store, deletion.onNoteDeleted), stampOnSave(store), ...deletion.disposables);
   context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store));
   context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store));
-  void store.load().then(() => console.log(`[note-map] activated, ${store.labels().length} notes`));
+  void store.load().then(() => console.log(`[anchor-notes] activated, ${store.labels().length} notes`));
 }
 
 export function deactivate(): void {

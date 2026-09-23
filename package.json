@@ -1,6 +1,6 @@
 {
-  "name": "note-map",
-  "displayName": "Note Map",
+  "name": "anchor-notes",
+  "displayName": "Anchor Notes",
   "description": "소스 코드에 심은 마커(@note:라벨)에 마크다운 메모를 붙인다",
   "version": "0.1.0",
   "publisher": "irony",
@@ -17,9 +17,9 @@
   ],
   "contributes": {
     "configuration": {
-      "title": "Note Map",
+      "title": "Anchor Notes",
       "properties": {
-        "noteMap.markerPrefix": {
+        "anchorNotes.markerPrefix": {
           "type": "string",
           "default": "@note:",
           "description": "코드에 심는 마커의 앞부분. 마커 = prefix + 라벨. 바꾸면 기존 마커가 전부 끊긴다"
@@ -28,8 +28,8 @@
     },
     "customEditors": [
       {
-        "viewType": "noteMap.noteEditor",
-        "displayName": "Note Map 메모",
+        "viewType": "anchorNotes.noteEditor",
+        "displayName": "Anchor Notes 메모",
         "selector": [
           {
             "filenamePattern": "**/.notemap/notes/*.md"
@@ -40,39 +40,39 @@
     ],
     "commands": [
       {
-        "command": "noteMap.noteHere",
+        "command": "anchorNotes.noteHere",
         "title": "이 줄에 메모 (열기/만들기)",
-        "category": "Note Map"
+        "category": "Anchor Notes"
       },
       {
-        "command": "noteMap.openNote",
+        "command": "anchorNotes.openNote",
         "title": "메모 열기",
-        "category": "Note Map"
+        "category": "Anchor Notes"
       },
       {
-        "command": "noteMap.rescan",
+        "command": "anchorNotes.rescan",
         "title": "마커 다시 찾기 (Rescan Workspace)",
-        "category": "Note Map"
+        "category": "Anchor Notes"
       },
       {
-        "command": "noteMap.deleteNote",
+        "command": "anchorNotes.deleteNote",
         "title": "메모 삭제",
-        "category": "Note Map"
+        "category": "Anchor Notes"
       },
       {
-        "command": "noteMap.findByTag",
+        "command": "anchorNotes.findByTag",
         "title": "태그로 메모 찾기",
-        "category": "Note Map"
+        "category": "Anchor Notes"
       },
       {
-        "command": "noteMap.renameNote",
+        "command": "anchorNotes.renameNote",
         "title": "라벨 이름 바꾸기",
-        "category": "Note Map"
+        "category": "Anchor Notes"
       }
     ],
     "keybindings": [
       {
-        "command": "noteMap.noteHere",
+        "command": "anchorNotes.noteHere",
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
         "when": "editorTextFocus"
@@ -81,7 +81,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "noteMap.openNote",
+          "command": "anchorNotes.openNote",
           "when": "false"
         }
       ]

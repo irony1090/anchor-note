@@ -104,7 +104,7 @@ export class NoteStore {
         throw error;
       }
       this.drop(label);
-      console.warn(`[note-map] ${label}${EXT} 건너뜀: ${error.message}`);
+      console.warn(`[anchor-notes] ${label}${EXT} 건너뜀: ${error.message}`);
     }
   }
 

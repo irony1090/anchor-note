@@ -11,7 +11,7 @@ export function registerCompletion(store: NoteStore): vscode.Disposable {
   let registration = register(store);
   // 트리거 문자가 prefix 마지막 글자라 prefix가 바뀌면 다시 등록한다
   const onConfig = vscode.workspace.onDidChangeConfiguration((event) => {
-    if (event.affectsConfiguration("noteMap.markerPrefix")) {
+    if (event.affectsConfiguration("anchorNotes.markerPrefix")) {
       registration.dispose();
       registration = register(store);
     }

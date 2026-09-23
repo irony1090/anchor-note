@@ -157,7 +157,7 @@ window.addEventListener("message", (event: MessageEvent<HostToEditor>) => {
       return;
     default: {
       const unhandled: never = message;
-      console.error("[note-map] unhandled host message", unhandled);
+      console.error("[anchor-notes] unhandled host message", unhandled);
     }
   }
 });

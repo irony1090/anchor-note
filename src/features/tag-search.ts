@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { NoteStore } from "../notes/store";
 import { OPEN_NOTE } from "./note-here";
 
-export const FIND_BY_TAG = "noteMap.findByTag";
+export const FIND_BY_TAG = "anchorNotes.findByTag";
 
 // 태그로 메모 찾기: 태그(메모 수) -> 그 태그의 메모 -> 연다 (R8 태그). 태그를 인자로 받으면 첫 단계를 건너뛴다
 export function registerTagSearch(store: NoteStore): vscode.Disposable {

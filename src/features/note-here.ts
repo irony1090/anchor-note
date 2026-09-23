@@ -6,8 +6,8 @@ import { NOTE_EDITOR_VIEW_TYPE } from "../editor/note-editor";
 import { insertMarker, markerPrefix } from "../markers/edit";
 import type { NoteStore } from "../notes/store";
 
-export const NOTE_HERE = "noteMap.noteHere";
-export const OPEN_NOTE = "noteMap.openNote";
+export const NOTE_HERE = "anchorNotes.noteHere";
+export const OPEN_NOTE = "anchorNotes.openNote";
 
 // Ctrl+Alt+M: 줄에 마커가 있으면 그 메모를, 없으면 라벨을 받아 마커를 넣고 메모를 연다 (R3 단축키·hover)
 export function registerNoteHere(store: NoteStore): vscode.Disposable[] {

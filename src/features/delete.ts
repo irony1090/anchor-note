@@ -5,7 +5,7 @@ import { findLabels } from "../markers/search";
 import type { MarkerLocation } from "../markers/search";
 import type { NoteStore } from "../notes/store";
 
-export const DELETE_NOTE = "noteMap.deleteNote";
+export const DELETE_NOTE = "anchorNotes.deleteNote";
 
 // 바깥 삭제를 모으는 시간. 여러 노트가 한꺼번에 지워지면 확인창 하나로 묻는다
 const BATCH_MS = 300;
@@ -139,7 +139,7 @@ export function registerDelete(store: NoteStore): DeleteFeature {
 }
 
 function findMarkers(labels: ReadonlySet<string>): Thenable<Map<string, MarkerLocation[]>> {
-  return vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: "Note Map: 마커 찾는 중" }, () =>
+  return vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: "Anchor Notes: 마커 찾는 중" }, () =>
     findLabels(labels, markerPrefix()),
   );
 }

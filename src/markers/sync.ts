@@ -5,7 +5,7 @@ import type { NoteStore } from "../notes/store";
 import { markerPrefix } from "./edit";
 import { sourcePath, sourceFiles } from "./search";
 
-export const RESCAN = "noteMap.rescan";
+export const RESCAN = "anchorNotes.rescan";
 
 type Plan = (anchors: Anchor[]) => Anchor[] | null;
 
@@ -18,7 +18,7 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
    */
   let chain: Promise<void> = Promise.resolve();
   const run = (task: () => Promise<unknown>) => {
-    chain = chain.then(async () => void (await task())).catch((error) => console.error("[note-map] sync failed", error));
+    chain = chain.then(async () => void (await task())).catch((error) => console.error("[anchor-notes] sync failed", error));
     return chain;
   };
 
@@ -56,7 +56,7 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
 
   const rescan = vscode.commands.registerCommand(RESCAN, () =>
     vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: "Note Map: 마커 다시 찾는 중", cancellable: true },
+      { location: vscode.ProgressLocation.Notification, title: "Anchor Notes: 마커 다시 찾는 중", cancellable: true },
       (_progress, token) => run(() => rescanWorkspace(store, token)),
     ),
   );
@@ -90,7 +90,7 @@ async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken
   );
   const orphans = [...found.keys()].filter((label) => store.get(label) === undefined).length;
   void vscode.window.showInformationMessage(
-    `Note Map: 메모 ${changed}개의 앵커를 고쳤습니다` + (orphans > 0 ? ` · 메모 없는 라벨 ${orphans}개` : ""),
+    `Anchor Notes: 메모 ${changed}개의 앵커를 고쳤습니다` + (orphans > 0 ? ` · 메모 없는 라벨 ${orphans}개` : ""),
   );
 }
 
@@ -111,7 +111,7 @@ async function applyAll(store: NoteStore, planFor: (label: string) => Plan, incl
       changed++;
     } catch (error) {
       // 깨진 노트 하나 때문에 나머지를 멈추지 않는다. 저장마다 창을 띄우지 않으려고 로그만 남긴다
-      console.warn(`[note-map] ${label} 앵커를 고치지 못함:`, error instanceof Error ? error.message : error);
+      console.warn(`[anchor-notes] ${label} 앵커를 고치지 못함:`, error instanceof Error ? error.message : error);
     }
   }
   return changed;

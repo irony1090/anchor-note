@@ -39,8 +39,8 @@ if (Object.keys(webviewEntries).length > 0) configs.push(webviewConfig);
 if (watch) {
   const contexts = await Promise.all(configs.map((c) => esbuild.context(c)));
   await Promise.all(contexts.map((c) => c.watch()));
-  console.log("[note-map] watching...");
+  console.log("[anchor-notes] watching...");
 } else {
   await Promise.all(configs.map((c) => esbuild.build(c)));
-  console.log("[note-map] build done");
+  console.log("[anchor-notes] build done");
 }
