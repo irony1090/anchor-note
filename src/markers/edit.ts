@@ -58,10 +58,13 @@ export async function removeMarkers(uris: vscode.Uri[], labels: ReadonlySet<stri
   return plan.count;
 }
 
-// from 마커의 라벨 부분만 to로 바꾸는 편집을 edit에 담는다 (라벨 이름 바꾸기). 적용은 부르는 쪽이 노트 이름 변경과 한 번에
+// from 마커의 라벨 부분만 to로 바꾸는 편집을 edit에 담는다 (라벨 이름 바꾸기, `#id`는 남긴다). 적용은 부르는 쪽이 노트 이름 변경과 한 번에
 export function planRenameMarkers(edit: vscode.WorkspaceEdit, uris: vscode.Uri[], from: string, to: string): Promise<MarkerPlan> {
   const prefixLength = markerPrefix().length;
-  return planMarkerLines(edit, uris, new Set([from]), (text, hit) => `${text.slice(0, hit.start + prefixLength)}${to}${text.slice(hit.end)}`);
+  return planMarkerLines(edit, uris, new Set([from]), (text, hit) => {
+    const labelStart = hit.start + prefixLength;
+    return `${text.slice(0, labelStart)}${to}${text.slice(labelStart + hit.label.length)}`;
+  });
 }
 
 export interface MarkerPlan {

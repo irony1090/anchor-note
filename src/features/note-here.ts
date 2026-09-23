@@ -144,7 +144,7 @@ function pickLabel(store: NoteStore, line: number): Promise<string | undefined> 
       : {
           label: typed,
           description: "$(error) 라벨로 쓸 수 없음",
-          detail: '/ \\ : * ? " < > | ` 와 끝의 마침표는 쓸 수 없습니다',
+          detail: '/ \\ : * ? " < > | ` # 와 끝의 마침표는 쓸 수 없습니다',
           alwaysShow: true,
         };
     quickPick.items = [fresh, ...existing];

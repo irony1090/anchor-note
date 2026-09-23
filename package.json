@@ -91,6 +91,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node test/run.mjs",
     "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production"
   },
   "devDependencies": {

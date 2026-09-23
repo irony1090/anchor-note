@@ -59,7 +59,7 @@ function askLabel(store: NoteStore, from: string): Thenable<string | undefined> 
           return undefined;
         }
         if (!isValidLabel(label)) {
-          return '/ \\ : * ? " < > | ` 와 끝의 마침표는 쓸 수 없습니다';
+          return '/ \\ : * ? " < > | ` # 와 끝의 마침표는 쓸 수 없습니다';
         }
         if (store.get(label) !== undefined) {
           return `이미 있는 라벨입니다: ${label}`;

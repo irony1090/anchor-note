@@ -3,6 +3,7 @@ obsidian-vault/**
 prototype_*/**
 src/**
 webview/**
+test/**
 node_modules/**
 esbuild.mjs
 tsconfig.json

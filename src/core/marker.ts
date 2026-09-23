@@ -2,7 +2,10 @@ import { isLabelChars, isValidLabel } from "./label";
 
 export interface MarkerHit {
   label: string;
+  // `라벨#id`의 id (D24 마커 id). 없으면 필드도 없다
+  id?: string;
   start: number;
+  // id까지 포함한 끝
   end: number;
 }
 
@@ -14,17 +17,23 @@ export function markerText(label: string, prefix: string): string {
 
 /**
  * 한 줄에서 마커를 전부 찾는다. hover·단축키·스캔·삭제·자동완성이 모두 이 함수 하나만 쓴다.
- * 규칙: prefix 뒤 공백 전까지의 덩어리가 유효한 라벨이어야 마커다. 그래서 `@note:a`가 `@note:ab`에 걸리지 않고,
- * 인용(`` `@note:a` ``)이나 문장 끝(`@note:a.`)은 마커가 아니다 — 경계 규칙이 갈라지면 hover는 보이는데 삭제는 안 되는 식으로 어긋난다.
+ * 규칙: prefix 뒤 공백 전까지의 덩어리가 유효한 `라벨` 또는 유효한 `라벨#id`여야 마커다 (D23 개정, D24 마커 id).
+ * 그래서 `@note:a`가 `@note:ab`에 걸리지 않고, 인용(`` `@note:a` ``)·문장 끝(`@note:a.`)·빈 id(`@note:a#`)는 마커가 아니다
+ * — 경계 규칙이 갈라지면 hover는 보이는데 삭제는 안 되는 식으로 어긋난다.
+ * `#`는 라벨·id 모두에 금지라 첫 `#`에서 자르는 것 하나로 충분하다.
  */
 export function markersIn(line: string, prefix: string): MarkerHit[] {
   const hits: MarkerHit[] = [];
   const pattern = new RegExp(`${escapeRegExp(prefix)}(\\S+)`, "g");
   for (const match of line.matchAll(pattern)) {
-    const label = match[1];
-    if (isValidLabel(label)) {
+    const chunk = match[1];
+    const cut = chunk.indexOf("#");
+    const label = cut === -1 ? chunk : chunk.slice(0, cut);
+    const id = cut === -1 ? undefined : chunk.slice(cut + 1);
+    if (isValidLabel(label) && (id === undefined || isValidLabel(id))) {
       const start = match.index;
-      hits.push({ label, start, end: start + match[0].length });
+      const end = start + match[0].length;
+      hits.push(id === undefined ? { label, start, end } : { label, id, start, end });
     }
   }
   return hits;
@@ -36,7 +45,7 @@ export interface PartialMarker {
   partial: string;
 }
 
-// 커서 앞 텍스트가 `prefix + 라벨 일부`로 끝나면 그 일부. 자동완성(R6)이 쓴다. 경계 규칙은 markersIn과 같다(앞쪽 경계 없음)
+// 커서 앞 텍스트가 `prefix + 라벨 일부`로 끝나면 그 일부. 자동완성(R6)이 쓴다. 경계 규칙은 markersIn과 같다(앞쪽 경계 없음). `#` 뒤(id 입력 중)는 null
 export function partialMarkerAt(before: string, prefix: string): PartialMarker | null {
   const at = before.lastIndexOf(prefix);
   if (at === -1) {

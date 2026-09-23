@@ -1,7 +1,7 @@
-// 파일명 금지 문자 + 제어문자 + 공백(D22 라벨 공백 금지) + 백틱(인용된 마커와 구분)
-const LABEL_FORBIDDEN = /[/\\:*?"<>|`\s\u0000-\u001f]/;
+// 파일명 금지 문자 + 제어문자 + 공백(D22 라벨 공백 금지) + 백틱(인용된 마커와 구분) + `#`(D24 마커 id 구분자)
+const LABEL_FORBIDDEN = /[/\\:*?"<>|`#\s\u0000-\u001f]/;
 
-// 라벨 = 노트 파일명 (D12 라벨 전역 유일). 마침표로 끝나면 문장 끝의 마커와 헷갈려 막는다
+// 라벨 = 노트 파일명 (D12 라벨 전역 유일). 마침표로 끝나면 문장 끝의 마커와 헷갈려 막는다. 마커 id도 같은 규칙 (D24 마커 id)
 export function isValidLabel(label: string): boolean {
   return label !== "" && !label.endsWith(".") && !LABEL_FORBIDDEN.test(label);
 }
