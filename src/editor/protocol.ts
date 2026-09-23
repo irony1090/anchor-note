@@ -2,6 +2,8 @@
 
 export interface CodeBlock {
   path: string;
+  // marker 앵커의 id (D24 마커 id)
+  id?: string;
   // 0-based 첫 줄 번호
   start: number;
   lines: string[];

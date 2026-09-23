@@ -65,6 +65,8 @@ test("partialMarkerAt: prefix 없음·공백 뒤는 null", () => {
   assert.equal(partialMarkerAt("// @note:a b", P), null);
 });
 
-test("markerText", () => {
+test("markerText: id가 있으면 `라벨#id`, markersIn으로 되읽힌다", () => {
   assert.equal(markerText("cache-scan", P), "@note:cache-scan");
+  assert.equal(markerText("cache-scan", P, "fix"), "@note:cache-scan#fix");
+  assert.deepEqual(markersIn(`// ${markerText("a", P, "x")}`, P), [{ label: "a", id: "x", start: 3, end: 12 }]);
 });

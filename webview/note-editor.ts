@@ -231,7 +231,7 @@ function renderCode(blocks: CodeBlock[]): void {
     const head = document.createElement("button");
     head.type = "button";
     head.className = "code-path";
-    head.textContent = block.focus === null ? block.path : `${block.path}:${block.focus + 1}`;
+    head.textContent = `${block.path}${block.focus === null ? "" : `:${block.focus + 1}`}${block.id === undefined ? "" : ` #${block.id}`}`;
     head.title = "에디터에서 열기";
     head.addEventListener("click", () =>
       api.postMessage({ type: "reveal", path: block.path, line: block.focus ?? block.start }),

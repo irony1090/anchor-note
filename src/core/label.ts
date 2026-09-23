@@ -6,6 +6,9 @@ export function isValidLabel(label: string): boolean {
   return label !== "" && !label.endsWith(".") && !LABEL_FORBIDDEN.test(label);
 }
 
+// 쓸 수 없는 글자 안내 문구. 라벨·id 입력창이 같이 쓴다
+export const LABEL_RULE_TEXT = '/ \\ : * ? " < > | ` # 와 끝의 마침표는 쓸 수 없습니다';
+
 // 라벨에 들어갈 수 있는 글자로만 됐는지. 쓰다 만 라벨(빈 문자열, 끝 마침표)도 통과한다
 export function isLabelChars(text: string): boolean {
   return !LABEL_FORBIDDEN.test(text);

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { isValidLabel, toLabel } from "../core/label";
+import { LABEL_RULE_TEXT, isValidLabel, toLabel } from "../core/label";
 import { markerPrefix, planRenameMarkers } from "../markers/edit";
 import type { MarkerPlan } from "../markers/edit";
 import { findLabels } from "../markers/search";
@@ -59,7 +59,7 @@ function askLabel(store: NoteStore, from: string): Thenable<string | undefined> 
           return undefined;
         }
         if (!isValidLabel(label)) {
-          return '/ \\ : * ? " < > | ` # 와 끝의 마침표는 쓸 수 없습니다';
+          return LABEL_RULE_TEXT;
         }
         if (store.get(label) !== undefined) {
           return `이미 있는 라벨입니다: ${label}`;

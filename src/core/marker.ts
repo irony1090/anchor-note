@@ -11,8 +11,8 @@ export interface MarkerHit {
 
 export const DEFAULT_PREFIX = "@note:";
 
-export function markerText(label: string, prefix: string): string {
-  return `${prefix}${label}`;
+export function markerText(label: string, prefix: string, id?: string): string {
+  return id === undefined ? `${prefix}${label}` : `${prefix}${label}#${id}`;
 }
 
 /**

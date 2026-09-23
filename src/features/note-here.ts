@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { markerAnchor } from "../core/anchors";
-import { isValidLabel, toLabel } from "../core/label";
+import { labelsInLines, markerAnchor } from "../core/anchors";
+import { LABEL_RULE_TEXT, isValidLabel, toLabel } from "../core/label";
 import { markerText, markersIn } from "../core/marker";
 import type { MarkerHit } from "../core/marker";
 import { NOTE_EDITOR_VIEW_TYPE } from "../editor/note-editor";
@@ -50,14 +50,18 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
       if (label === undefined) {
         return;
       }
+      const id = await askId(doc, label);
+      if (id === null) {
+        return;
+      }
       // 마커를 먼저 넣는다. 노트 생성이 실패해도 남는 건 노트 없는 마커라 hover가 [메모 만들기]로 받아준다
-      const inserted = await insertMarker(doc.uri, line, label);
+      const inserted = await insertMarker(doc.uri, line, label, id);
       if (inserted.bare) {
         void vscode.window.showWarningMessage(
-          `주석 문법을 모르는 파일이라 마커만 넣었습니다. 직접 주석으로 감싸주세요: ${markerText(label, markerPrefix())}`,
+          `주석 문법을 모르는 파일이라 마커만 넣었습니다. 직접 주석으로 감싸주세요: ${markerText(label, markerPrefix(), id)}`,
         );
       }
-      await ensureNote(store, label, path, undefined);
+      await ensureNote(store, label, path, id);
       await openNote(label);
     } catch (error) {
       void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
@@ -97,6 +101,35 @@ async function ensureNote(store: NoteStore, label: string, path: string, id: str
   } else {
     await store.addAnchor(label, markerAnchor(path, id));
   }
+}
+
+// 이 파일에 id 없는 같은 라벨 마커가 이미 있으면 id를 받는다 (D24 마커 id). 없으면 undefined(id 없이 넣음), 취소하면 null
+async function askId(doc: vscode.TextDocument, label: string): Promise<string | undefined | null> {
+  const lines = Array.from({ length: doc.lineCount }, (_, i) => doc.lineAt(i).text);
+  const ids = labelsInLines(lines, markerPrefix()).get(label);
+  if (ids === undefined || !ids.has(undefined)) {
+    return undefined;
+  }
+  const used = [...ids].filter((id) => id !== undefined);
+  const input = await vscode.window.showInputBox({
+    title: `이 파일에 ${markerText(label, markerPrefix())}가 이미 있습니다 — 새 마커의 id`,
+    prompt: "id는 같은 파일·같은 라벨 안에서만 겹치지 않으면 됩니다",
+    placeHolder: used.length > 0 ? `쓰인 id: ${used.join(", ")}` : "예: fix",
+    validateInput: (value) => {
+      const id = toLabel(value);
+      if (id === "") {
+        return "id를 입력하세요";
+      }
+      if (!isValidLabel(id)) {
+        return LABEL_RULE_TEXT;
+      }
+      if (ids.has(id)) {
+        return `이 파일에서 이미 쓰인 id입니다: ${id}`;
+      }
+      return /\s/.test(value.trim()) ? { message: `공백은 _로 바뀝니다: ${id}`, severity: vscode.InputBoxValidationSeverity.Info } : null;
+    },
+  });
+  return input === undefined ? null : toLabel(input);
 }
 
 // 커서가 마커 위면 그것, 아니면 그 줄의 첫 마커
@@ -145,7 +178,7 @@ function pickLabel(store: NoteStore, line: number): Promise<string | undefined> 
       : {
           label: typed,
           description: "$(error) 라벨로 쓸 수 없음",
-          detail: '/ \\ : * ? " < > | ` # 와 끝의 마침표는 쓸 수 없습니다',
+          detail: LABEL_RULE_TEXT,
           alwaysShow: true,
         };
     quickPick.items = [fresh, ...existing];

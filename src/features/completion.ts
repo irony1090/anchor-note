@@ -37,8 +37,8 @@ function register(store: NoteStore): vscode.Disposable {
         if (found === null) {
           return undefined;
         }
-        // 커서가 라벨 중간이면 뒤쪽 남은 글자까지 바꿀 수 있게 한다 (Tab/Enter 설정에 따라 insert 또는 replace)
-        const tail = /^\S*/.exec(line.slice(position.character))?.[0] ?? "";
+        // 커서가 라벨 중간이면 뒤쪽 남은 글자까지 바꿀 수 있게 한다 (Tab/Enter 설정에 따라 insert 또는 replace). `#id` 앞에서 멈춘다
+        const tail = /^[^\s#]*/.exec(line.slice(position.character))?.[0] ?? "";
         const tailEnd = position.character + (isLabelChars(tail) ? tail.length : 0);
         const start = new vscode.Position(position.line, found.start);
         const range = {

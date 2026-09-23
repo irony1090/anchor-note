@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { markersIn } from "../core/marker";
+import { markerText, markersIn } from "../core/marker";
 import { markerPrefix } from "../markers/edit";
 import type { NoteStore } from "../notes/store";
 import { DELETE_NOTE } from "./delete";
@@ -25,11 +25,11 @@ export function registerHover(store: NoteStore): vscode.Disposable {
         const note = store.get(hit.label);
         if (note === undefined) {
           const args = commandArgs([doc.uri.toString(), position.line, hit.start]);
-          md.appendMarkdown(`메모 없음: \`${hit.label}\`\n\n[메모 만들기](command:${NOTE_HERE}?${args})`);
+          md.appendMarkdown(`메모 없음: \`${markerText(hit.label, "", hit.id)}\`\n\n[메모 만들기](command:${NOTE_HERE}?${args})`);
         } else {
           const args = commandArgs([hit.label]);
           md.appendMarkdown(
-            `**${escapeMd(note.meta.title)}** · [메모 열기](command:${OPEN_NOTE}?${args}) · [이름 변경](command:${RENAME_NOTE}?${args}) · [삭제](command:${DELETE_NOTE}?${args})\n\n`,
+            `**${escapeMd(note.meta.title)}**${hit.id === undefined ? "" : ` \`#${hit.id}\``} · [메모 열기](command:${OPEN_NOTE}?${args}) · [이름 변경](command:${RENAME_NOTE}?${args}) · [삭제](command:${DELETE_NOTE}?${args})\n\n`,
           );
           if (note.tags.length > 0) {
             md.appendMarkdown(`${note.tags.map((tag) => `\`#${tag}\``).join(" ")}\n\n`);
