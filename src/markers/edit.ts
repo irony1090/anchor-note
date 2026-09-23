@@ -10,8 +10,6 @@ export function markerPrefix(): string {
 }
 
 export interface Inserted {
-  // 삽입 후의 그 줄 전체. 앵커의 lineText가 된다
-  lineText: string;
   // 주석 문법을 몰라 마커만 넣었는지
   bare: boolean;
 }
@@ -39,7 +37,7 @@ export async function insertMarker(uri: vscode.Uri, line: number, label: string)
   if (!wasDirty) {
     await doc.save();
   }
-  return { lineText: doc.lineAt(line).text, bare: wrapped.bare };
+  return { bare: wrapped.bare };
 }
 
 // 파일들에서 labels의 마커를 전부 지운다 (R7 메모 삭제). 주석에 마커만 있었으면 주석째, 그 줄이 비면 줄째 지운다 (B11 빈 주석 껍데기 잔존)

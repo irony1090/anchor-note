@@ -29,7 +29,7 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
       return;
     }
     const found = labelsInLines(linesOf(doc), markerPrefix());
-    void run(() => applyAll(store, (label) => (anchors) => syncFileAnchors(anchors, path, found.get(label)), false));
+    void run(() => applyAll(store, (label) => (anchors) => syncFileAnchors(anchors, path, found.has(label))));
   });
 
   const onRename = vscode.workspace.onDidRenameFiles((event) => {
@@ -41,7 +41,7 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
       const to = sourcePath(newUri);
       // 첫 폴더 밖이나 노트 저장소 안으로 옮겼으면 삭제와 같다
       const plan: Plan = to === null ? (anchors) => dropAnchors(anchors, from) : (anchors) => renameAnchors(anchors, from, to);
-      void run(() => applyAll(store, () => plan, true));
+      void run(() => applyAll(store, () => plan));
     }
   });
 
@@ -49,7 +49,7 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
     for (const uri of event.files) {
       const path = sourcePath(uri);
       if (path !== null) {
-        void run(() => applyAll(store, () => (anchors) => dropAnchors(anchors, path), true));
+        void run(() => applyAll(store, () => (anchors) => dropAnchors(anchors, path)));
       }
     }
   });
@@ -66,12 +66,12 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
 
 async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken): Promise<void> {
   const prefix = markerPrefix();
-  // 라벨 -> (경로 -> 그 파일에서 처음 나온 마커 줄)
-  const found = new Map<string, Map<string, string>>();
+  // 라벨 -> 그 라벨 마커가 있는 경로들
+  const found = new Map<string, Set<string>>();
   for await (const source of sourceFiles(token)) {
-    for (const [label, lineText] of labelsInLines(source.lines, prefix)) {
-      const paths = found.get(label) ?? new Map<string, string>();
-      paths.set(source.path, lineText);
+    for (const label of labelsInLines(source.lines, prefix)) {
+      const paths = found.get(label) ?? new Set<string>();
+      paths.add(source.path);
       found.set(label, paths);
     }
   }
@@ -80,26 +80,22 @@ async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken
     return;
   }
 
-  const changed = await applyAll(
-    store,
-    (label) => (anchors) => {
-      const next = rescanAnchors(anchors, found.get(label) ?? new Map());
-      return sameAnchors(anchors, next) ? null : next;
-    },
-    false,
-  );
+  const changed = await applyAll(store, (label) => (anchors) => {
+    const next = rescanAnchors(anchors, found.get(label) ?? new Set());
+    return sameAnchors(anchors, next) ? null : next;
+  });
   const orphans = [...found.keys()].filter((label) => store.get(label) === undefined).length;
   void vscode.window.showInformationMessage(
     `Anchor Notes: 메모 ${changed}개의 앵커를 고쳤습니다` + (orphans > 0 ? ` · 메모 없는 라벨 ${orphans}개` : ""),
   );
 }
 
-// 노트마다 plan을 적용하고 바뀐 노트 수를 돌려준다. 파일 메모(kind=file)는 마커가 없으니 이름 변경·삭제만 따른다
-async function applyAll(store: NoteStore, planFor: (label: string) => Plan, includeFileNotes: boolean): Promise<number> {
+// 노트마다 plan을 적용하고 바뀐 노트 수를 돌려준다. file 앵커를 건너뛰는 건 plan(core/anchors) 쪽이 한다
+async function applyAll(store: NoteStore, planFor: (label: string) => Plan): Promise<number> {
   let changed = 0;
   for (const label of store.labels()) {
     const note = store.get(label);
-    if (note === undefined || (note.meta.kind === "file" && !includeFileNotes)) {
+    if (note === undefined) {
       continue;
     }
     const next = planFor(label)(note.meta.anchors);

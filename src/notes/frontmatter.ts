@@ -6,17 +6,10 @@
 
 const FENCE = "---";
 
-export type NoteKind = "marker" | "file";
-
-export interface Anchor {
-  // 워크스페이스 상대경로 (D8 마크다운 저장)
-  path: string;
-  // 앵커를 기록한 시점의 그 줄. 위치 찾기에는 안 쓴다 (D11 코드 라벨 앵커)
-  lineText?: string;
-}
+// 앵커 종류 = frontmatter 키 이름 `- marker:` / `- file:` (D25 앵커 종류는 키 이름). path는 워크스페이스 상대경로 (D8 마크다운 저장)
+export type Anchor = { kind: "marker"; path: string; id?: string } | { kind: "file"; path: string };
 
 export interface NoteMeta {
-  kind: NoteKind;
   title: string;
   anchors: Anchor[];
   created: string;
@@ -50,7 +43,10 @@ export function parseNote(text: string, label: string): ParsedNote {
   }
 
   const { head } = split;
-  const meta: NoteMeta = { kind: "marker", title: label, anchors: [], created: "", updated: "", extra: [] };
+  const meta: NoteMeta = { title: label, anchors: [], created: "", updated: "", extra: [] };
+  // 옛 형식의 노트 단위 kind. `- path:` 항목을 frontmatter를 다 읽은 뒤 변환한다 — kind 줄이 anchors 뒤에 있어도 맞게
+  let legacyKind: "marker" | "file" = "marker";
+  let entries: Array<Map<string, string>> = [];
 
   for (let i = 0; i < head.length; i++) {
     const line = head[i];
@@ -69,7 +65,8 @@ export function parseNote(text: string, label: string): ParsedNote {
       case "label":
         break; // 파일명이 라벨의 원본이다. 어긋나 있으면 다음 저장 때 맞춰진다
       case "kind":
-        meta.kind = scalar(raw) === "file" ? "file" : "marker";
+        // 아는 키로 읽고 버린다. extra로 흘리면 옛 노트에 영원히 남는다
+        legacyKind = scalar(raw) === "file" ? "file" : "marker";
         break;
       case "title":
         meta.title = scalar(raw) || label;
@@ -83,7 +80,7 @@ export function parseNote(text: string, label: string): ParsedNote {
       case "anchors": {
         const block = takeBlock(head, i, raw);
         i = block.next;
-        meta.anchors = block.maps.map(toAnchor);
+        entries = block.maps;
         break;
       }
       default:
@@ -95,21 +92,22 @@ export function parseNote(text: string, label: string): ParsedNote {
     }
   }
 
+  meta.anchors = entries.map((entry) => toAnchor(entry, legacyKind));
   return { meta, body: text.slice(split.bodyStart) };
 }
 
 // 여는 `---`부터 닫는 `---` 줄바꿈까지. 이 문자열을 [0, bodyOffset) 자리에 그대로 갈아 끼운다
 export function serializeMeta(label: string, meta: NoteMeta, eol = "\n"): string {
-  const lines = [FENCE, `label: ${emit(label)}`, `kind: ${meta.kind}`, `title: ${emit(meta.title)}`];
+  const lines = [FENCE, `label: ${emit(label)}`, `title: ${emit(meta.title)}`];
 
   if (meta.anchors.length === 0) {
     lines.push("anchors: []");
   } else {
     lines.push("anchors:");
     for (const anchor of meta.anchors) {
-      lines.push(`  - path: ${emit(anchor.path)}`);
-      if (anchor.lineText !== undefined) {
-        lines.push(`    lineText: ${emit(anchor.lineText)}`);
+      lines.push(`  - ${anchor.kind}: ${emit(anchor.path)}`);
+      if (anchor.kind === "marker" && anchor.id !== undefined) {
+        lines.push(`    id: ${emit(anchor.id)}`);
       }
     }
   }
@@ -258,11 +256,23 @@ function readPair(text: string, into: Map<string, string>): void {
   }
 }
 
-function toAnchor(entry: Map<string, string>): Anchor {
+// 새 형식 `- marker:`(+ `id:`) / `- file:`, 옛 형식 `- path:`는 노트의 kind로 종류를 정한다. lineText는 읽고 버린다 (D25 앵커 종류는 키 이름)
+function toAnchor(entry: Map<string, string>, legacyKind: "marker" | "file"): Anchor {
+  const marker = entry.get("marker");
+  const file = entry.get("file");
+  if (marker !== undefined && file !== undefined) {
+    throw new BrokenNoteError("anchors 항목에 marker와 file이 같이 있다");
+  }
+  if (file !== undefined) {
+    return { kind: "file", path: scalar(file) };
+  }
+  if (marker !== undefined) {
+    const id = scalar(entry.get("id") ?? "");
+    return id === "" ? { kind: "marker", path: scalar(marker) } : { kind: "marker", path: scalar(marker), id };
+  }
   const path = entry.get("path");
   if (path === undefined) {
-    throw new BrokenNoteError("anchors 항목에 path가 없다");
+    throw new BrokenNoteError("anchors 항목에 marker·file·path가 없다");
   }
-  const lineText = entry.get("lineText");
-  return lineText === undefined ? { path: scalar(path) } : { path: scalar(path), lineText: scalar(lineText) };
+  return { kind: legacyKind, path: scalar(path) };
 }

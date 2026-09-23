@@ -4,7 +4,7 @@ import { markerPrefix } from "../markers/edit";
 import type { NoteMeta } from "../notes/frontmatter";
 import type { CodeBlock } from "./protocol";
 
-// 마커 줄 위아래로 보여줄 줄 수 / 파일 메모나 마커를 못 찾았을 때 앞에서 보여줄 줄 수
+// 마커 줄 위아래로 보여줄 줄 수 / file 앵커나 마커를 못 찾았을 때 앞에서 보여줄 줄 수
 const CONTEXT_LINES = 3;
 const FILE_HEAD_LINES = 15;
 
@@ -21,14 +21,14 @@ export async function codeBlocks(label: string, meta: NoteMeta): Promise<CodeBlo
     try {
       // 열린 문서면 저장 안 한 내용 기준이다
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(root, anchor.path));
-      const focus = meta.kind === "file" ? null : findLine(doc, label, prefix);
+      const focus = anchor.kind === "file" ? null : findLine(doc, label, prefix);
       const start = focus === null ? 0 : Math.max(0, focus - CONTEXT_LINES);
       const end = Math.min(doc.lineCount, focus === null ? FILE_HEAD_LINES : focus + CONTEXT_LINES + 1);
       const lines: string[] = [];
       for (let i = start; i < end; i++) {
         lines.push(doc.lineAt(i).text);
       }
-      const missing = meta.kind !== "file" && focus === null ? "마커를 찾지 못했습니다 (파일 앞부분)" : undefined;
+      const missing = anchor.kind === "marker" && focus === null ? "마커를 찾지 못했습니다 (파일 앞부분)" : undefined;
       blocks.push({ path: anchor.path, start, lines, focus, missing });
     } catch (error) {
       blocks.push({ path: anchor.path, start: 0, lines: [], focus: null, missing: describe(error) });

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { sameAnchor } from "../core/anchors";
 import { isValidLabel } from "../core/label";
 import { tagsIn } from "../core/tag";
 import { BrokenNoteError, bodyOffset, parseNote, serializeMeta, serializeNote } from "./frontmatter";
@@ -130,7 +131,7 @@ export class NoteStore {
     const now = new Date().toISOString();
     const note: Omit<Note, "tags"> = {
       label,
-      meta: { kind: "marker", title: label, anchors: anchor === null ? [] : [anchor], created: now, updated: now, extra: [] },
+      meta: { title: label, anchors: anchor === null ? [] : [anchor], created: now, updated: now, extra: [] },
       body: "",
     };
     await vscode.workspace.fs.createDirectory(dir);
@@ -215,10 +216,10 @@ export class NoteStore {
     }
   }
 
-  // 이 경로 앵커가 없을 때만 덧붙인다. 앵커 단위 = (라벨, 경로) 쌍 하나 (D14 라벨 다중 앵커)
+  // 같은 앵커(core/anchors sameAnchor)가 없을 때만 덧붙인다 (D14 라벨 다중 앵커)
   async addAnchor(label: string, anchor: Anchor): Promise<void> {
     const note = this.require(label);
-    if (!note.meta.anchors.some((known) => known.path === anchor.path)) {
+    if (!note.meta.anchors.some((known) => sameAnchor(known, anchor))) {
       await this.writeMeta(label, { ...note.meta, anchors: [...note.meta.anchors, anchor] });
     }
   }

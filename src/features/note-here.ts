@@ -40,7 +40,7 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
 
       const found = pickMarker(markersIn(text, markerPrefix()), character);
       if (found !== undefined) {
-        await ensureNote(store, found.label, path, text);
+        await ensureNote(store, found.label, path);
         await openNote(found.label);
         return;
       }
@@ -56,7 +56,7 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
           `주석 문법을 모르는 파일이라 마커만 넣었습니다. 직접 주석으로 감싸주세요: ${markerText(label, markerPrefix())}`,
         );
       }
-      await ensureNote(store, label, path, inserted.lineText);
+      await ensureNote(store, label, path);
       await openNote(label);
     } catch (error) {
       void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
@@ -90,11 +90,11 @@ function anchorPath(store: NoteStore, uri: vscode.Uri): string {
 }
 
 // 없으면 만들고, 있는데 이 파일이 앵커에 없으면 덧붙인다 (D14 라벨 다중 앵커)
-async function ensureNote(store: NoteStore, label: string, path: string, lineText: string): Promise<void> {
+async function ensureNote(store: NoteStore, label: string, path: string): Promise<void> {
   if (store.get(label) === undefined) {
-    await store.create(label, { path, lineText });
+    await store.create(label, { kind: "marker", path });
   } else {
-    await store.addAnchor(label, { path, lineText });
+    await store.addAnchor(label, { kind: "marker", path });
   }
 }
 
