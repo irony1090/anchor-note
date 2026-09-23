@@ -21,7 +21,7 @@ export async function codeBlocks(label: string, meta: NoteMeta): Promise<CodeBlo
     try {
       // 열린 문서면 저장 안 한 내용 기준이다
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(root, anchor.path));
-      const focus = anchor.kind === "file" ? null : findLine(doc, label, prefix);
+      const focus = anchor.kind === "file" ? null : findLine(doc, label, anchor.id, prefix);
       const start = focus === null ? 0 : Math.max(0, focus - CONTEXT_LINES);
       const end = Math.min(doc.lineCount, focus === null ? FILE_HEAD_LINES : focus + CONTEXT_LINES + 1);
       const lines: string[] = [];
@@ -50,9 +50,10 @@ export async function reveal(path: string, line: number, memoColumn: vscode.View
   await vscode.window.showTextDocument(uri, { viewColumn: column, selection: new vscode.Range(position, position) });
 }
 
-function findLine(doc: vscode.TextDocument, label: string, prefix: string): number | null {
+// 이 라벨·이 id(undefined = id 없는 마커)의 첫 마커 줄
+function findLine(doc: vscode.TextDocument, label: string, id: string | undefined, prefix: string): number | null {
   for (let i = 0; i < doc.lineCount; i++) {
-    if (markersIn(doc.lineAt(i).text, prefix).some((hit) => hit.label === label)) {
+    if (markersIn(doc.lineAt(i).text, prefix).some((hit) => hit.label === label && hit.id === id)) {
       return i;
     }
   }

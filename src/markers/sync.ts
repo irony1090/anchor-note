@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { dropAnchors, labelsInLines, renameAnchors, rescanAnchors, sameAnchors, syncFileAnchors } from "../core/anchors";
+import type { MarkerIds } from "../core/anchors";
 import type { Anchor } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
 import { markerPrefix } from "./edit";
@@ -29,7 +30,7 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
       return;
     }
     const found = labelsInLines(linesOf(doc), markerPrefix());
-    void run(() => applyAll(store, (label) => (anchors) => syncFileAnchors(anchors, path, found.has(label))));
+    void run(() => applyAll(store, (label) => (anchors) => syncFileAnchors(anchors, path, found.get(label) ?? new Set())));
   });
 
   const onRename = vscode.workspace.onDidRenameFiles((event) => {
@@ -66,12 +67,12 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
 
 async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken): Promise<void> {
   const prefix = markerPrefix();
-  // 라벨 -> 그 라벨 마커가 있는 경로들
-  const found = new Map<string, Set<string>>();
+  // 라벨 -> (경로 -> 그 파일의 이 라벨 마커 id들)
+  const found = new Map<string, Map<string, MarkerIds>>();
   for await (const source of sourceFiles(token)) {
-    for (const label of labelsInLines(source.lines, prefix)) {
-      const paths = found.get(label) ?? new Set<string>();
-      paths.add(source.path);
+    for (const [label, ids] of labelsInLines(source.lines, prefix)) {
+      const paths = found.get(label) ?? new Map<string, MarkerIds>();
+      paths.set(source.path, ids);
       found.set(label, paths);
     }
   }
@@ -81,7 +82,7 @@ async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken
   }
 
   const changed = await applyAll(store, (label) => (anchors) => {
-    const next = rescanAnchors(anchors, found.get(label) ?? new Set());
+    const next = rescanAnchors(anchors, found.get(label) ?? new Map());
     return sameAnchors(anchors, next) ? null : next;
   });
   const orphans = [...found.keys()].filter((label) => store.get(label) === undefined).length;
