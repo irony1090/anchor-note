@@ -1,20 +1,32 @@
 import * as vscode from "vscode";
+import { excludeMatcher, expandBraces } from "../core/glob";
 import { markersIn } from "../core/marker";
 import { NOTES_DIR } from "../notes/store";
 
 const NOTEMAP_DIR = NOTES_DIR.split("/")[0];
-const EXCLUDE = "{**/node_modules/**,**/.git/**,**/.notemap/**,**/dist/**}";
+// package.json 기본값과 같게. 노트 저장소는 설정과 상관없이 항상 뺀다 (하위 폴더의 다른 저장소 포함)
+const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**", "**/dist/**"];
+const NOTES_EXCLUDE = "**/.notemap/**";
 const MAX_BYTES = 1024 * 1024;
 const BATCH = 50;
 
-// 마커를 찾을 소스 파일의 상대경로 (D8 마크다운 저장). 첫 폴더 밖이거나 노트 저장소 안이면 null
-export function sourcePath(uri: vscode.Uri): string | null {
+// 설정 `anchorNotes.exclude` (워크스페이스 상대 glob)
+function configuredExclude(): string[] {
+  const value = vscode.workspace.getConfiguration("anchorNotes").get<unknown>("exclude", DEFAULT_EXCLUDE);
+  return Array.isArray(value) ? value.filter((glob): glob is string => typeof glob === "string" && glob !== "") : DEFAULT_EXCLUDE;
+}
+
+/**
+ * 마커를 찾을 소스 파일의 상대경로 (D8 마크다운 저장). 첫 폴더 밖·노트 저장소 안·제외 설정에 걸리면 null.
+ * 저장 시 동기화와 다시 찾기가 같은 제외 규칙을 써야 한다 — 다르면 저장할 때 붙은 앵커를 다시 찾기가 떼어 낸다.
+ */
+export function sourcePath(uri: vscode.Uri, excluded = excludeMatcher(configuredExclude())): string | null {
   const root = vscode.workspace.workspaceFolders?.[0];
   if (root === undefined || vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() !== root.uri.toString()) {
     return null;
   }
   const path = vscode.workspace.asRelativePath(uri, false);
-  return path === NOTEMAP_DIR || path.startsWith(`${NOTEMAP_DIR}/`) ? null : path;
+  return path === NOTEMAP_DIR || path.startsWith(`${NOTEMAP_DIR}/`) || excluded(path) ? null : path;
 }
 
 export interface SourceText {
@@ -29,7 +41,11 @@ export async function* sourceFiles(token?: vscode.CancellationToken): AsyncGener
   if (root === undefined) {
     return;
   }
-  const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*"), EXCLUDE, undefined, token);
+  const globs = configuredExclude();
+  const excluded = excludeMatcher(globs);
+  // findFiles에서 먼저 빼야 node_modules 같은 큰 폴더를 목록으로 받지 않는다. 판정은 readSource의 sourcePath가 한 번 더 한다
+  const exclude = `{${[...globs.flatMap(expandBraces), NOTES_EXCLUDE].join(",")}}`;
+  const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*"), exclude, undefined, token);
   const open = new Map(
     vscode.workspace.textDocuments.filter((doc) => !doc.isClosed).map((doc) => [doc.uri.toString(), doc] as const),
   );
@@ -38,7 +54,7 @@ export async function* sourceFiles(token?: vscode.CancellationToken): AsyncGener
     if (token?.isCancellationRequested) {
       return;
     }
-    const batch = await Promise.all(uris.slice(i, i + BATCH).map((uri) => readSource(uri, open.get(uri.toString()))));
+    const batch = await Promise.all(uris.slice(i, i + BATCH).map((uri) => readSource(uri, open.get(uri.toString()), excluded)));
     for (const source of batch) {
       if (source !== null) {
         yield source;
@@ -47,8 +63,12 @@ export async function* sourceFiles(token?: vscode.CancellationToken): AsyncGener
   }
 }
 
-async function readSource(uri: vscode.Uri, doc: vscode.TextDocument | undefined): Promise<SourceText | null> {
-  const path = sourcePath(uri);
+async function readSource(
+  uri: vscode.Uri,
+  doc: vscode.TextDocument | undefined,
+  excluded: (path: string) => boolean,
+): Promise<SourceText | null> {
+  const path = sourcePath(uri, excluded);
   if (path === null) {
     return null;
   }
