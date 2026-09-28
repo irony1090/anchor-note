@@ -1,8 +1,8 @@
 // 본문 `#태그` 인식 (R8 태그). 규칙은 Obsidian과 맞춘다 — vault REF-tags.md 인식 규칙 표
+import { markdownLines } from "./fence";
 
 // 태그 문자 = 글자·숫자·`_`·`-`·`/`(계층)
 const TAG = /#([\p{L}\p{N}_\-/]+)/gu;
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 
 export interface TagSpan {
   // `#`의 위치
@@ -18,25 +18,10 @@ export interface TagSpan {
  */
 export function tagSpans(markdown: string): TagSpan[] {
   const spans: TagSpan[] = [];
-  let fence: string | null = null;
-  let offset = 0;
 
-  for (const line of markdown.split("\n")) {
-    const lineStart = offset;
-    offset += line.length + 1;
-
-    const fenceMatch = FENCE.exec(line);
-    if (fence !== null) {
-      // 여는 펜스와 같은 문자, 같거나 긴 길이, 뒤에 공백만 있으면 닫힌다
-      const closes = fenceMatch !== null && fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length;
-      if (closes && line.slice(fenceMatch[0].length).trim() === "") {
-        fence = null;
-      }
-      continue;
-    }
-    if (fenceMatch !== null) {
-      fence = fenceMatch[1];
-      continue;
+  for (const { text: line, start: lineStart, kind } of markdownLines(markdown)) {
+    if (kind !== "text") {
+      continue; // 펜스 줄과 코드 블록 안
     }
 
     const masked = maskInlineCode(line);

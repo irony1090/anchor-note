@@ -90,6 +90,11 @@
         "command": "anchorNotes.detachFile",
         "title": "이 파일에서 메모 떼기",
         "category": "Anchor Notes"
+      },
+      {
+        "command": "anchorNotes.insertCode",
+        "title": "메모 코드 넣기",
+        "category": "Anchor Notes"
       }
     ],
     "keybindings": [
@@ -101,6 +106,13 @@
       }
     ],
     "menus": {
+      "editor/context": [
+        {
+          "command": "anchorNotes.insertCode",
+          "when": "editorTextFocus && !editorReadonly",
+          "group": "7_anchorNotes@1"
+        }
+      ],
       "commandPalette": [
         {
           "command": "anchorNotes.openNote",

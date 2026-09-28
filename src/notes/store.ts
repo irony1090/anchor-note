@@ -66,6 +66,20 @@ export class NoteStore {
     return [...this.notes.keys()];
   }
 
+  // 지금 보이는 본문. 노트 문서가 열려 있으면 저장 안 한 내용까지, 아니면 디스크 본문 (R11 코드 넣기·동기화)
+  liveBody(label: string): string | undefined {
+    const uri = this.uriOf(label)?.toString();
+    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri);
+    if (doc !== undefined) {
+      const text = doc.getText();
+      const offset = bodyOffset(text);
+      if (offset !== null) {
+        return text.slice(offset);
+      }
+    }
+    return this.notes.get(label)?.body;
+  }
+
   async load(): Promise<void> {
     this.notes.clear();
     const dir = this.dir;

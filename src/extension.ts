@@ -5,6 +5,7 @@ import { registerDelete } from "./features/delete";
 import { registerMarkerChecks } from "./features/diagnostics";
 import { registerFileNotes } from "./features/file-notes";
 import { registerHover } from "./features/hover";
+import { registerInsertCode } from "./features/insert-code";
 import { registerNoteHere } from "./features/note-here";
 import { registerRename } from "./features/rename";
 import { registerTagSearch } from "./features/tag-search";
@@ -15,7 +16,7 @@ import { watchNotes } from "./notes/watcher";
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new NoteStore();
-  context.subscriptions.push(store, registerTagSearch(store), registerRename(store));
+  context.subscriptions.push(store, registerTagSearch(store), registerRename(store), registerInsertCode(store));
   // watcher를 load보다 먼저 붙인다. 읽는 사이에 바뀐 파일을 놓치지 않게
   const deletion = registerDelete(store);
   context.subscriptions.push(watchNotes(store, deletion.onNoteDeleted), stampOnSave(store), ...deletion.disposables);
