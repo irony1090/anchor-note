@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import { NoteEditorProvider } from "./editor/note-editor";
 import { registerCompletion } from "./features/completion";
 import { registerDelete } from "./features/delete";
+import { registerMarkerChecks } from "./features/diagnostics";
 import { registerHover } from "./features/hover";
 import { registerNoteHere } from "./features/note-here";
 import { registerRename } from "./features/rename";
@@ -17,7 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // watcher를 load보다 먼저 붙인다. 읽는 사이에 바뀐 파일을 놓치지 않게
   const deletion = registerDelete(store);
   context.subscriptions.push(watchNotes(store, deletion.onNoteDeleted), stampOnSave(store), ...deletion.disposables);
-  context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store));
+  context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store), ...registerMarkerChecks());
   context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store));
   void store.load().then(() => console.log(`[anchor-notes] activated, ${store.labels().length} notes`));
 }
