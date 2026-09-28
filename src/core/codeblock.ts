@@ -13,6 +13,8 @@ export interface CodeBlock {
   start: number;
   end: number;
   closed: boolean;
+  // 여는 펜스 앞 공백 수 (0이면 없음). 내용을 되돌려 쓸 때 줄마다 붙인다 (R11 메모에 반영)
+  indent?: number;
 }
 
 export function codeBlocks(markdown: string): CodeBlock[] {
@@ -44,6 +46,9 @@ export function codeBlocks(markdown: string): CodeBlock[] {
     }
     if (name !== undefined && isValidLabel(name)) {
       block.name = name;
+    }
+    if ((open.indent ?? 0) > 0) {
+      block.indent = open.indent;
     }
     blocks.push(block);
     i = j;

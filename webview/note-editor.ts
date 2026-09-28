@@ -1,8 +1,10 @@
 // 메모 에디터 웹뷰 (R4 메모 에디터) — 위 미리보기, 아래 입력. 미리보기는 입력마다 호스트 왕복 없이 다시 그린다
 
 import { marked } from "marked";
+import { codeBlocks } from "../src/core/codeblock";
+import { isValidLabel } from "../src/core/label";
 import { tagSpans, tagsIn } from "../src/core/tag";
-import type { EditorToHost, HostToEditor } from "../src/editor/protocol";
+import type { BlockLinks, BlockProblem, EditorToHost, HostToEditor, LinkRow, LinkState } from "../src/editor/protocol";
 import type { Anchor } from "../src/notes/frontmatter";
 import { Splitters } from "./splitters";
 import { TagComplete } from "./tag-complete";
@@ -19,10 +21,30 @@ declare function acquireVsCodeApi(): VsCodeApi;
 const TAG_OPEN = "\uE000";
 const TAG_CLOSE = "\uE001";
 
-// 생 HTML은 버린다
+// 코드 연결 상태 (R11 C8). 호스트가 linkStatus로 보낸다. 미리보기를 그릴 때마다 연결된 블록에 머리 줄을 붙인다
+let links: { blocks: BlockLinks[]; problems: BlockProblem[] } = { blocks: [], problems: [] };
+let linkOpen: Record<string, boolean> = {};
+// 이번에 그리는 본문의 펜스 블록 수. 이름 없는 연결은 블록이 하나뿐일 때만 그 블록을 가리킨다 (key "")
+let fenceCount = 0;
+
+// 생 HTML은 버린다. 연결된 펜스 블록은 자리표만 두고 머리 줄은 decorateLinks가 DOM으로 붙인다
 marked.use({
   gfm: true,
-  renderer: { html: () => "" },
+  renderer: {
+    html: () => "",
+    code: ({ text, lang, codeBlockStyle }) => {
+      if (codeBlockStyle === "indented") {
+        return false;
+      }
+      const [first = "", second] = (lang ?? "").split(/\s+/);
+      const key = second !== undefined && isValidLabel(second) ? second : fenceCount === 1 ? "" : undefined;
+      if (key === undefined || !links.blocks.some((block) => block.key === key)) {
+        return false;
+      }
+      const cls = first === "" ? "" : ` class="language-${escapeHtml(first)}"`;
+      return `<div class="code-link" data-key="${escapeHtml(key)}"><pre><code${cls}>${escapeHtml(text)}\n</code></pre></div>`;
+    },
+  },
   extensions: [
     {
       name: "tag",
@@ -161,6 +183,11 @@ window.addEventListener("message", (event: MessageEvent<HostToEditor>) => {
     case "layout":
       splitters.apply(message.layout);
       return;
+    case "linkStatus":
+      links = { blocks: message.blocks, problems: message.problems };
+      linkOpen = message.open;
+      renderPreview(input.value);
+      return;
     default: {
       const unhandled: never = message;
       console.error("[anchor-notes] unhandled host message", unhandled);
@@ -172,15 +199,126 @@ api.postMessage({ type: "ready" });
 
 function renderPreview(body: string): void {
   renderTags(body);
-  if (body.trim() === "") {
+  if (body.trim() === "" && links.problems.length === 0) {
     previewEl.classList.add("empty");
     previewEl.textContent = "(빈 메모)";
     return;
   }
   previewEl.classList.remove("empty");
+  fenceCount = codeBlocks(body).length;
   // 들여쓰기 코드 블록처럼 tagSpans가 모르는 코드 안에 표시 문자가 남으면 원래 글자로 되돌린다
   const html = marked.parse(markTags(body)) as string;
   previewEl.innerHTML = html.replaceAll(TAG_OPEN, "#").replaceAll(TAG_CLOSE, "");
+  decorateLinks();
+}
+
+// --- 코드 연결 (R11 C8 메모 에디터 표시 — 안 A 머리 줄 + 펼침 목록) ---
+
+const MARK: Record<LinkState, string> = { synced: "✓", pending: "●", changed: "!", lost: "✕" };
+const STATE_TEXT: Record<LinkState, string> = { synced: "동기화됨", pending: "반영 대기", changed: "코드가 바뀜", lost: "코드에서 못 찾음" };
+
+function decorateLinks(): void {
+  previewEl.prepend(...links.problems.map(problemBar));
+  for (const holder of previewEl.querySelectorAll<HTMLElement>(".code-link")) {
+    const block = links.blocks.find((b) => b.key === holder.dataset.key);
+    if (block !== undefined) {
+      holder.prepend(...linkHead(block));
+    }
+  }
+}
+
+// 미리보기 맨 위 경고 줄: 메모에서 못 찾은 블록
+function problemBar(problem: BlockProblem): HTMLElement {
+  const bar = el("div", "link-warn");
+  const name = problem.key === "" ? "(이름 없음)" : problem.key;
+  const what = problem.kind === "duplicate" ? `블록 이름 ${name}이 본문에서 겹칩니다` : problem.key === "" ? "이름 없는 연결은 코드 블록이 하나뿐일 때만 쓸 수 있습니다" : `블록 ${name}을 본문에서 찾을 수 없습니다`;
+  bar.append(el("span", "link-warn-mark", "!"), el("span", "link-warn-text", `${what} · 연결 ${problem.anchors.length}곳`));
+  bar.append(
+    button("블록 다시 고르기", () => api.postMessage({ type: "repickBlock", key: problem.key })),
+    button("연결 끊기", () => api.postMessage({ type: "unlink", anchors: problem.anchors })),
+  );
+  return bar;
+}
+
+// 머리 줄 + (펼치면) 연결 목록. 기본 펼침 = ✓ 아닌 연결이 하나라도 있을 때
+function linkHead(block: BlockLinks): HTMLElement[] {
+  const counts = new Map<LinkState, number>();
+  block.rows.forEach((row) => counts.set(row.state, (counts.get(row.state) ?? 0) + 1));
+  const open = linkOpen[block.key] ?? block.rows.some((row) => row.state !== "synced");
+
+  const head = el("div", "link-head");
+  const toggle = button(open ? "▾" : "▸", () => {
+    linkOpen[block.key] = !open;
+    api.postMessage({ type: "linkOpen", key: block.key, open: !open });
+    renderPreview(input.value);
+  });
+  toggle.className = "link-toggle";
+  toggle.setAttribute("aria-label", open ? "연결 목록 접기" : "연결 목록 펼치기");
+  head.append(toggle, el("span", "link-name", block.key === "" ? "(이름 없음)" : block.key), el("span", "link-count", `${block.rows.length}곳 연결`));
+  for (const state of ["synced", "pending", "changed", "lost"] as const) {
+    const n = counts.get(state);
+    if (n !== undefined) {
+      head.append(el("span", `link-state ${state}`, `${MARK[state]}${n}`));
+    }
+  }
+  head.append(el("span", "link-gap"));
+  const all = button("모두 동기화", () => api.postMessage({ type: "syncBlock", key: block.key }));
+  all.className = "link-sync-all";
+  all.disabled = !counts.has("pending");
+  all.title = all.disabled ? "반영 대기인 연결이 없습니다" : "반영 대기인 연결을 모두 메모 내용으로";
+  head.append(all);
+  return open ? [head, linkList(block.rows)] : [head];
+}
+
+function linkList(rows: LinkRow[]): HTMLElement {
+  const list = el("div", "link-list");
+  for (const row of rows) {
+    const line = el("div", `link-row ${row.state}`);
+    const id = row.anchor.kind === "marker" && row.anchor.id !== undefined ? `#${row.anchor.id}` : "";
+    const path = button(`${row.anchor.path}${id}`, () => api.postMessage({ type: "openAnchor", anchor: row.anchor }));
+    path.className = "link-path";
+    path.title = "코드로 이동";
+    line.append(el("span", "link-mark", MARK[row.state]), path, el("span", "link-text", STATE_TEXT[row.state]));
+    if (row.reason !== undefined) {
+      line.append(el("span", "link-reason", row.reason));
+    }
+    line.append(el("span", "link-gap"), ...rowActions(row));
+    list.append(line);
+  }
+  return list;
+}
+
+function rowActions(row: LinkRow): HTMLButtonElement[] {
+  const { anchor } = row;
+  const open = () => button("열기", () => api.postMessage({ type: "openAnchor", anchor }));
+  switch (row.state) {
+    case "synced":
+      return [open()];
+    case "pending":
+      return [button("동기화", () => api.postMessage({ type: "syncLink", anchor }), "primary"), open()];
+    case "changed":
+      return [button("메모로 덮기", () => api.postMessage({ type: "overwrite", anchor })), button("메모에 반영", () => api.postMessage({ type: "adopt", anchor }))];
+    case "lost":
+      return [button("다시 고르기", () => api.postMessage({ type: "repick", anchor })), open(), button("연결 끊기", () => api.postMessage({ type: "unlink", anchors: [anchor] }))];
+  }
+}
+
+function button(text: string, onClick: () => void, variant?: "primary"): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = variant === "primary" ? "link-btn primary" : "link-btn";
+  b.textContent = text;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function el(tag: string, className: string, text?: string): HTMLElement {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) {
+    node.textContent = text;
+  }
+  return node;
 }
 
 // 이 메모의 태그를 상단에 (저장 전 본문 기준)

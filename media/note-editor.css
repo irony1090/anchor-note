@@ -310,3 +310,162 @@ body {
   color: var(--vscode-editorSuggestWidget-selectedForeground, inherit);
   background-color: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
 }
+
+/* --- 코드 연결 (R11 C8 안 A: 머리 줄 + 펼침 목록) --- */
+
+.code-link {
+  margin: 1em 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.code-link pre {
+  margin: 0;
+}
+
+.code-link pre code {
+  border-radius: 0;
+}
+
+.link-head,
+.link-row,
+.link-warn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 0.9em;
+}
+
+.link-head {
+  padding: 3px 8px;
+  background-color: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorWidget-background));
+}
+
+.link-toggle {
+  width: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+
+.link-name,
+.link-path {
+  font-family: var(--vscode-editor-font-family);
+}
+
+.link-count,
+.link-reason {
+  color: var(--vscode-descriptionForeground);
+}
+
+.link-gap {
+  flex-grow: 1;
+}
+
+.link-list {
+  border-top: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-editorWidget-background);
+}
+
+.link-row {
+  padding: 3px 8px 3px 34px;
+}
+
+.link-mark {
+  width: 12px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.link-path {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.link-path:hover {
+  text-decoration: underline;
+}
+
+/* 상태 색: ✓ 초록 / ● 파랑 / ! 노랑 / ✕ 빨강 */
+.synced .link-mark,
+.synced .link-text,
+.link-state.synced {
+  color: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+
+.pending .link-mark,
+.pending .link-text,
+.link-state.pending {
+  color: var(--vscode-charts-blue);
+}
+
+.changed .link-mark,
+.changed .link-text,
+.link-state.changed {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.lost .link-mark,
+.lost .link-text,
+.link-state.lost {
+  color: var(--vscode-errorForeground);
+}
+
+.link-btn,
+.link-sync-all {
+  padding: 1px 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  background: none;
+  color: var(--vscode-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-btn:hover,
+.link-sync-all:hover:enabled {
+  border-color: var(--vscode-focusBorder);
+}
+
+.link-btn.primary,
+.link-sync-all:enabled {
+  border-color: transparent;
+  color: var(--vscode-button-foreground);
+  background-color: var(--vscode-button-background);
+}
+
+.link-btn.primary:hover,
+.link-sync-all:hover:enabled {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.link-sync-all:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* 미리보기 맨 위 경고 줄: 메모에서 못 찾은 블록 */
+.link-warn {
+  margin: 8px 0;
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-editorWarning-foreground));
+  border-radius: 3px;
+  background-color: var(--vscode-inputValidation-warningBackground, transparent);
+}
+
+.link-warn-mark {
+  font-weight: 700;
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.link-warn-text {
+  flex-grow: 1;
+}

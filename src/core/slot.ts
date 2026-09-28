@@ -43,18 +43,49 @@ export function locateSlot(region: string, ctx: SlotContext): Located {
 }
 
 /**
- * [start, end)를 딱 한 곳으로 가리키는 가장 짧은 문맥. 범위 끝까지 늘려도 안 되면 null.
- * prefix를 먼저 늘리고, 각 길이에서 suffix를 가장 짧은 것부터 시험한다. 짧을수록 코드가 바뀌어도 덜 깨진다.
+ * [start, end)를 딱 한 곳으로 가리키는 문맥. 범위 끝까지 늘려도 안 되면 null. 세 단계로 시험한다:
+ * ① 같은 줄에서 prefix를 **단어 단위**로 왼쪽으로 늘린다 — 이름(`.baud_rate = `)이 문맥에 들어가 줄 끝 공백 같은 우연에 기대지 않는다.
+ * ② 글자 단위로 늘리되 공백에 기대는 문맥(줄 끝 공백 포함, 바깥 끝이 공백)은 건너뛴다 — 저장 시 공백 제거·줄 추가로 깨진다.
+ * ③ ①②가 다 안 되면 예전처럼 가장 짧은 것 (연결 자체를 막지 않으려고).
+ * 각 prefix에서 suffix는 가장 짧은 것부터. 경위: vault REF-code-sync-ui 3절 (u2가 `", \n"`으로 구분되던 문제).
  */
 export function pickContext(region: string, start: number, end: number): SlotContext | null {
-  for (let p = start === 0 ? 0 : 1; p <= start; p++) {
-    const prefix = region.slice(start - p, start);
-    for (let s = end === region.length ? 0 : 1; s <= region.length - end; s++) {
-      const ctx = { prefix, suffix: region.slice(end, end + s) };
-      const at = locateSlot(region, ctx);
-      if (typeof at !== "string" && at.start === start && at.end === end) {
-        return ctx;
+  const lineStart = region.lastIndexOf("\n", start - 1) + 1;
+  for (let b = start - 1; b >= lineStart; b--) {
+    if (/\S/.test(region[b]) && (b === lineStart || /\s/.test(region[b - 1]))) {
+      const found = trySuffixes(region, start, end, region.slice(b, start), true);
+      if (found !== null) {
+        return found;
       }
+    }
+  }
+  for (const sturdy of [true, false]) {
+    for (let p = start === 0 ? 0 : 1; p <= start; p++) {
+      const prefix = region.slice(start - p, start);
+      if (sturdy && (/^\s/.test(prefix) || FRAGILE.test(prefix))) {
+        continue;
+      }
+      const found = trySuffixes(region, start, end, prefix, sturdy);
+      if (found !== null) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+// 줄 끝 공백 — 저장할 때 지워지기 쉽다
+const FRAGILE = /[ \t]\r?\n/;
+
+function trySuffixes(region: string, start: number, end: number, prefix: string, sturdy: boolean): SlotContext | null {
+  for (let s = end === region.length ? 0 : 1; s <= region.length - end; s++) {
+    const suffix = region.slice(end, end + s);
+    if (sturdy && (/\s$/.test(suffix) || FRAGILE.test(suffix))) {
+      continue;
+    }
+    const at = locateSlot(region, { prefix, suffix });
+    if (typeof at !== "string" && at.start === start && at.end === end) {
+      return { prefix, suffix };
     }
   }
   return null;

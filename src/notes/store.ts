@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { sameAnchor } from "../core/anchors";
+import { codeBlocks } from "../core/codeblock";
 import { isValidLabel } from "../core/label";
+import { blockEdit, findBlock } from "../core/sync-state";
 import { tagsIn } from "../core/tag";
 import { BrokenNoteError, bodyOffset, parseNote, serializeMeta, serializeNote } from "./frontmatter";
 import type { Anchor, NoteMeta } from "./frontmatter";
@@ -244,7 +246,49 @@ export class NoteStore {
   }
 
   /**
-   * 노트 파일에 frontmatter만 다시 쓴다. 노트 파일 쓰기 통로는 이것 하나다 (새 메모 생성 제외).
+   * [메모에 반영] (R11 C7): 본문 코드 블록 하나의 내용과 anchors를 **WorkspaceEdit 하나**로 바꾼다. writeMeta 원칙의 유일한 예외.
+   * 따로 적용하면 먼저 한 본문 편집으로 문서가 dirty가 되어 writeMeta가 저장을 건너뛴다. dirty 여부는 두 편집 전에 한 번 잰다.
+   * 블록은 지금 문서 텍스트에서 이름으로 다시 찾는다 — 입력으로 위치가 바뀌었을 수 있다. 바꾸는 건 펜스 사이 내용뿐이다.
+   */
+  async replaceBlock(label: string, name: string | undefined, content: string, anchors: Anchor[]): Promise<void> {
+    const note = this.require(label);
+    const meta = { ...note.meta, anchors };
+    const uri = vscode.Uri.joinPath(this.requireDir(), `${label}${EXT}`);
+    const doc = vscode.workspace.textDocuments.find((open) => !open.isClosed && open.uri.toString() === uri.toString());
+    const text = doc?.getText() ?? (await readText(uri));
+    const start = bodyOffset(text);
+    if (start === null) {
+      throw brokenError(label);
+    }
+    const eol = eolOf(text);
+    const block = findBlock(codeBlocks(text.slice(start)), name);
+    const edit = typeof block === "string" ? null : blockEdit(block, content, eol);
+    if (edit === null) {
+      throw new NoteStoreError(`메모에서 코드 블록 ${name ?? "(이름 없음)"}을 찾지 못했습니다 (없거나, 이름이 겹치거나, 닫는 펜스가 없음)`);
+    }
+    const header = serializeMeta(label, meta, eol);
+    const body = `${text.slice(start, start + edit.start)}${edit.text}${text.slice(start + edit.end)}`;
+
+    if (doc !== undefined) {
+      const wasDirty = doc.isDirty;
+      const we = new vscode.WorkspaceEdit();
+      we.replace(uri, new vscode.Range(doc.positionAt(0), doc.positionAt(start)), header);
+      we.replace(uri, new vscode.Range(doc.positionAt(start + edit.start), doc.positionAt(start + edit.end)), edit.text);
+      if (!(await vscode.workspace.applyEdit(we))) {
+        throw new NoteStoreError(`노트를 고치지 못했습니다: ${label}${EXT}`);
+      }
+      if (!wasDirty) {
+        await doc.save();
+      }
+      this.put({ ...note, meta, body: wasDirty ? note.body : body });
+    } else {
+      await vscode.workspace.fs.writeFile(uri, encode(`${header}${body}`));
+      this.put({ ...note, meta, body });
+    }
+  }
+
+  /**
+   * 노트 파일에 frontmatter만 다시 쓴다. 노트 파일 쓰기 통로는 이것 하나다 (새 메모 생성, replaceBlock 제외).
    * 열린 문서면 frontmatter 범위만 WorkspaceEdit로 바꾸고 본문은 건드리지 않는다 — 파일 전체를 다시 쓰면
    * 메모 에디터에서 저장 안 한 본문이 디스크 본문으로 덮인다 (프로토타입의 덮어쓰기 버그).
    * 편집 전에 dirty였으면 저장하지 않는다. 사용자가 저장 안 한 본문을 대신 확정하지 않으려는 것이다.

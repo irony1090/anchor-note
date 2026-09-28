@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import { NoteEditorProvider } from "./editor/note-editor";
 import { registerCodeLink } from "./features/code-link";
+import { registerCodeSync } from "./features/code-sync";
 import { registerCompletion } from "./features/completion";
 import { registerDelete } from "./features/delete";
 import { registerMarkerChecks } from "./features/diagnostics";
@@ -22,7 +23,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const deletion = registerDelete(store);
   context.subscriptions.push(watchNotes(store, deletion.onNoteDeleted), stampOnSave(store), ...deletion.disposables);
   context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store), ...registerMarkerChecks());
-  context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store), ...registerFileNotes(store));
+  context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store), ...registerFileNotes(store), ...registerCodeSync(store));
   void store.load().then(() => console.log(`[anchor-notes] activated, ${store.labels().length} notes`));
 }
 

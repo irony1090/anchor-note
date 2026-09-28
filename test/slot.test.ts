@@ -21,19 +21,37 @@ test("locateSlot: 못 찾음·여러 곳", () => {
   assert.equal(locateSlot("f(1); f(2);", { prefix: "f(", suffix: ")" }), "ambiguous");
 });
 
-test("pickContext: 가장 짧은 유일 문맥 -> locateSlot으로 되찾힌다", () => {
+test("pickContext: prefix는 단어 단위로 -> 이름이 들어간다", () => {
   const span = at(LINE, "921600");
   const ctx = pickContext(LINE, span.start, span.end);
-  // " "·"= "는 여러 곳에 맞아서 "e = "까지 늘어난다
-  assert.deepEqual(ctx, { prefix: "e = ", suffix: "," });
+  // "= "는 여러 곳에 맞아서 한 단어 더 늘어난다 (글자 단위였으면 "e = ")
+  assert.deepEqual(ctx, { prefix: ".baud_rate = ", suffix: "," });
   assert.deepEqual(locateSlot(LINE, ctx!), span);
 });
 
 test("pickContext: 겹치는 자리가 있으면 문맥을 늘린다", () => {
   const text = "f(1); f(2);";
   const ctx = pickContext(text, 8, 9); // "2"
-  assert.deepEqual(ctx, { prefix: " f(", suffix: ")" });
+  // "f("는 두 곳 -> 단어 하나 더 (공백으로 시작하는 " f("는 쓰지 않는다)
+  assert.deepEqual(ctx, { prefix: "f(1); f(", suffix: ")" });
   assert.deepEqual(locateSlot(text, ctx!), { start: 8, end: 9 });
+});
+
+test("pickContext: 줄 끝 공백·범위 끝에 기대지 않는다 (sync.test.c u2)", () => {
+  const region = "        .baud_rate = 19200, \n        .baud_rate2 = 19200, ";
+  const span = at(region, "19200");
+  const ctx = pickContext(region, span.start, span.end);
+  // 예전: { prefix: "= ", suffix: ", \n" } — 줄 끝 공백이 지워지거나 줄이 추가되면 못 찾음
+  assert.deepEqual(ctx, { prefix: ".baud_rate = ", suffix: "," });
+  // 공백을 지우고 줄을 더해도 같은 자리
+  const edited = "        .baud_rate = 19200,\n        .baud_rate2 = 19200,\n        .x = 1,";
+  assert.deepEqual(locateSlot(edited, ctx!), at(edited, "19200"));
+});
+
+test("pickContext: 공백에 기대는 것밖에 없으면 그래도 돌려준다", () => {
+  const text = "1 \n1";
+  const ctx = pickContext(text, 0, 1);
+  assert.deepEqual(locateSlot(text, ctx!), { start: 0, end: 1 });
 });
 
 test("pickContext: 범위 맨 앞·맨 끝이면 빈 문맥", () => {

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { adopt, linkStatus, linkedPaths, repick, repickBlock, reportErrors, syncBlock, syncLink, unlink } from "../features/code-sync";
 import { DELETE_NOTE } from "../features/delete";
 import { RENAME_NOTE } from "../features/rename";
 import { FIND_BY_TAG } from "../features/tag-search";
@@ -12,6 +13,8 @@ import type { EditorToHost, HostToEditor, Layout } from "./protocol";
 export const NOTE_EDITOR_VIEW_TYPE = "anchorNotes.noteEditor";
 // 영역 크기 비율. 워크스페이스가 아니라 전역에 둔다 — 새로 여는 모든 메모에 같은 배치
 const LAYOUT_KEY = "anchorNotes.editorLayout";
+// 코드 연결 목록 펼침 ("라벨/블록" -> 펼침). 레이아웃처럼 전역
+const LINK_OPEN_KEY = "anchorNotes.linkOpen";
 
 const BROKEN = "frontmatter가 깨져 본문을 고칠 수 없습니다. 텍스트 에디터로 여세요 (Reopen Editor With > Text Editor)";
 
@@ -77,14 +80,43 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
 
     const sendTags = () => post({ type: "tags", counts: [...this.store.tagCounts(label)] });
 
+    // 코드 연결 상태 (R11 C8). 입력·코드 변경마다 부르므로 모아서 한 번. 늦게 끝난 옛 계산은 버린다
+    let linkTimer: ReturnType<typeof setTimeout> | undefined;
+    let linkRun = 0;
+    let watched = new Set<string>();
+    const sendLinks = (delay = 300) => {
+      clearTimeout(linkTimer);
+      linkTimer = setTimeout(async () => {
+        const run = ++linkRun;
+        const { body, anchors } = readDoc(document, label);
+        watched = linkedPaths(anchors);
+        const status = await linkStatus(label, body, anchors);
+        if (run === linkRun) {
+          const saved = this.globalState.get<Record<string, boolean>>(LINK_OPEN_KEY) ?? {};
+          const open = Object.fromEntries(status.blocks.flatMap(({ key }) => (`${label}/${key}` in saved ? [[key, saved[`${label}/${key}`]]] : [])));
+          post({ type: "linkStatus", ...status, open });
+        }
+      }, delay);
+    };
+    const act = async (task: () => Promise<void>) => {
+      await reportErrors(task);
+      sendLinks(0);
+    };
+
     const changeSub = vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document.uri.toString() === document.uri.toString() && ownEdits === 0) {
-        sendDoc();
+      if (event.document.uri.toString() === document.uri.toString()) {
+        if (ownEdits === 0) {
+          sendDoc();
+        }
+        sendLinks();
+      } else if (watched.has(vscode.workspace.asRelativePath(event.document.uri, false))) {
+        sendLinks();
       }
     });
     // 다른 메모가 저장되면 태그 후보가 바뀐다
     const storeSub = this.store.onDidChange(sendTags);
     panel.onDidDispose(() => {
+      clearTimeout(linkTimer);
       changeSub.dispose();
       storeSub.dispose();
     });
@@ -99,6 +131,7 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
           }
           sendDoc();
           sendTags();
+          sendLinks(0);
           return;
         }
         case "layout":
@@ -116,6 +149,7 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
             await vscode.commands.executeCommand(RESCAN);
           } finally {
             post({ type: "rescanned" });
+            sendLinks(0);
           }
           return;
         case "delete":
@@ -135,6 +169,33 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
         case "findTag":
           await vscode.commands.executeCommand(FIND_BY_TAG, message.tag);
           return;
+        case "syncLink":
+          await act(() => syncLink(this.store, label, message.anchor, false));
+          return;
+        case "overwrite":
+          await act(() => syncLink(this.store, label, message.anchor, true));
+          return;
+        case "syncBlock":
+          await act(() => syncBlock(this.store, label, message.key));
+          return;
+        case "adopt":
+          // 본문을 고치므로 applyBody 체인에 줄 세운다 — 앞선 입력의 본문 전체 교체가 뒤늦게 적용되면 반영을 되돌린다
+          queue = queue.then(() => act(() => adopt(this.store, label, message.anchor)));
+          return;
+        case "repick":
+          await reportErrors(() => repick(label, message.anchor, panel.viewColumn));
+          return;
+        case "repickBlock":
+          await act(() => repickBlock(this.store, label, message.key));
+          return;
+        case "unlink":
+          await act(() => unlink(this.store, label, message.anchors));
+          return;
+        case "linkOpen": {
+          const saved = this.globalState.get<Record<string, boolean>>(LINK_OPEN_KEY) ?? {};
+          await this.globalState.update(LINK_OPEN_KEY, { ...saved, [`${label}/${message.key}`]: message.open });
+          return;
+        }
         default: {
           const unhandled: never = message;
           console.error("[anchor-notes] unhandled editor message", unhandled);

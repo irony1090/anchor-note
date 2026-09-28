@@ -16,7 +16,7 @@ import { anchorPath, askId } from "./note-here";
 
 export const LINK_CODE = "anchorNotes.linkCode";
 
-// 메모 코드와 연결 (R11 C6 연결 명령). 선택이 범위 안 일부면 열 단위, 아니면 선택한 줄을 범위로 감싸 줄 단위
+// 메모 코드와 연결 (R11 C6 연결 명령). 범위 안 선택 = 열 단위, 범위 밖은 줄 일부 선택이면 감싸고 열 단위, 줄 전체면 줄 단위
 export function registerCodeLink(store: NoteStore): vscode.Disposable {
   return vscode.commands.registerCommand(LINK_CODE, async () => {
     try {
@@ -69,13 +69,18 @@ async function linkColumn(store: NoteStore, editor: vscode.TextEditor, path: str
   );
 }
 
-// 줄 단위: 선택한 줄(빈 선택이면 커서가 있는 빈 줄)을 여는/닫는 마커로 감싸고 블록 내용으로 채운다
+/*
+ * 범위 밖 선택. 줄 전체(빈 선택 포함)면 줄 단위: 선택한 줄(빈 선택이면 커서가 있는 빈 줄)을 감싸고 블록 내용으로 채운다.
+ * 줄의 일부만 선택했으면 열 단위: 걸친 줄들을 내용 그대로 감싸고 선택 글자만 블록 값으로 바꾼 뒤 그 자리의 문맥을 기억한다
+ * (범위 만들기 + 범위 안 연결을 한 번에. 예전에는 줄 단위로 먼저 감싸야 해서 그 줄이 메모 내용으로 덮였다).
+ */
 async function linkLines(store: NoteStore, editor: vscode.TextEditor, path: string, lines: string[], regions: Region[]): Promise<void> {
   const doc = editor.document;
   const { start, end, isEmpty } = editor.selection;
   const first = start.line;
   // 다음 줄 맨 앞까지 끌어 선택한 경우 그 줄은 빼고
   const last = !isEmpty && end.character === 0 && end.line > first ? end.line - 1 : end.line;
+  const partial = !isEmpty && (start.character > leadOf(lines[first]) || (end.line === last && end.character < lines[last].trimEnd().length));
   if (isEmpty && lines[first].trim() !== "") {
     throw new Error("연결할 줄을 선택하거나, 빈 줄에서 실행하세요");
   }
@@ -96,6 +101,27 @@ async function linkLines(store: NoteStore, editor: vscode.TextEditor, path: stri
   const indent = /^\s*/.exec(lines[first])?.[0] ?? "";
   const selected = lines.slice(first, last + 1);
   const value = blockValue(block.content);
+  const prefix = markerPrefix();
+  const open = `${indent}${wrapMarker(doc.languageId, markerText(label, prefix, id)).text}`;
+  const close = `${indent}${wrapMarker(doc.languageId, closeMarkerText(label, prefix, id)).text}`;
+  const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
+  const range = new vscode.Range(first, 0, last, lines[last].length);
+
+  if (partial) {
+    const inner = selected.join("\n");
+    const from = start.character;
+    const to = Math.min(inner.length, selected.slice(0, end.line - first).reduce((n, line) => n + line.length + 1, 0) + end.character);
+    const next = `${inner.slice(0, from)}${value}${inner.slice(to)}`;
+    const ctx = pickContext(next, from, from + value.length);
+    if (ctx === null) {
+      throw new Error("이 자리를 가리킬 앞뒤 문맥을 찾지 못했습니다. 선택한 줄 안에 같은 글자가 너무 많습니다");
+    }
+    const text = [open, ...next.split("\n"), close].join(eol);
+    const link: CodeLink = { ...blockKey(block), prefix: ctx.prefix, suffix: ctx.suffix, hash: slotHash(value) };
+    await applyLinked(store, doc, label, path, id, link, (edit) => edit.replace(doc.uri, range, text));
+    return;
+  }
+
   if (selected.some((line) => line.trim() !== "") && dedentLines(selected, indent) !== value) {
     const replace = "메모 코드로 바꾸기";
     const answer = await vscode.window.showWarningMessage(`선택한 ${selected.length}줄을 메모 코드로 바꿉니다.`, { modal: true }, replace);
@@ -104,12 +130,7 @@ async function linkLines(store: NoteStore, editor: vscode.TextEditor, path: stri
     }
   }
 
-  const prefix = markerPrefix();
-  const open = `${indent}${wrapMarker(doc.languageId, markerText(label, prefix, id)).text}`;
-  const close = `${indent}${wrapMarker(doc.languageId, closeMarkerText(label, prefix, id)).text}`;
-  const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
   const text = [open, ...indentLines(block.content, indent), close].join(eol);
-  const range = new vscode.Range(first, 0, last, lines[last].length);
   await applyLinked(store, doc, label, path, id, { ...blockKey(block), hash: slotHash(value) }, (edit) => edit.replace(doc.uri, range, text));
 }
 
@@ -181,6 +202,11 @@ async function pickLinkBlock(store: NoteStore, label: string): Promise<CodeBlock
     throw new Error(`블록 이름 "${name}"이 메모 안에서 겹칩니다. 하나만 남기세요`);
   }
   return picked.block;
+}
+
+// 줄 앞 공백 수. 선택이 여기부터면 줄 앞을 다 고른 것으로 본다
+function leadOf(line: string): number {
+  return line.length - line.trimStart().length;
 }
 
 function blockKey(block: CodeBlock): { block?: string } {
