@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { DELETE_NOTE } from "../features/delete";
 import { RENAME_NOTE } from "../features/rename";
 import { FIND_BY_TAG } from "../features/tag-search";
+import { RESCAN } from "../markers/sync";
 import { BrokenNoteError, bodyOffset, parseNote } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
 import { codeBlocks, reveal } from "./code-preview";
@@ -106,6 +107,14 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         case "requestCode":
           post({ type: "code", blocks: await this.codeFor(document, label) });
+          return;
+        case "rescan":
+          // 다시 찾기가 노트 anchors를 고친 뒤 읽어야 한다. 취소·실패해도 보내야 웹뷰 버튼이 다시 켜진다
+          try {
+            await vscode.commands.executeCommand(RESCAN);
+          } finally {
+            post({ type: "code", blocks: await this.codeFor(document, label) });
+          }
           return;
         case "reveal":
           await reveal(message.path, message.line, panel.viewColumn);

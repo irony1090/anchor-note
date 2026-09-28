@@ -31,6 +31,8 @@ export type EditorToHost =
   | { type: "ready" }
   | { type: "edit"; body: string }
   | { type: "requestCode" }
+  // 마커 다시 찾기 후 코드 보기를 다시 받는다 (REF-browse 2절)
+  | { type: "rescan" }
   | { type: "reveal"; path: string; line: number }
   | { type: "delete" }
   | { type: "rename" }

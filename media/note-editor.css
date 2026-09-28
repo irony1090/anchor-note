@@ -98,7 +98,8 @@ body {
 }
 
 #rename,
-#delete {
+#delete,
+.code-bar button {
   background: none;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 2px;
@@ -108,7 +109,8 @@ body {
   cursor: pointer;
 }
 
-#rename:hover {
+#rename:hover,
+.code-bar button:hover:enabled {
   color: var(--vscode-foreground);
   border-color: var(--vscode-focusBorder);
 }
@@ -124,6 +126,17 @@ body {
   grid-row: 3;
   overflow: auto;
   padding: 6px 12px;
+}
+
+.code-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.code-bar button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .code-block + .code-block {

@@ -215,7 +215,7 @@ function escapeHtml(text: string): string {
 }
 
 function renderCode(blocks: CodeBlock[]): void {
-  codeEl.replaceChildren();
+  codeEl.replaceChildren(rescanBar());
   if (blocks.length === 0) {
     const none = document.createElement("p");
     none.className = "code-none";
@@ -260,6 +260,24 @@ function renderCode(blocks: CodeBlock[]): void {
     wrap.appendChild(pre);
     codeEl.appendChild(wrap);
   }
+}
+
+// 코드 보기 머리의 [다시 찾기]. 밖에서 옮긴 마커(못 찾음)와 새로 생긴 마커(안내 없음)를 둘 다 덮으려고 항상 둔다.
+// 누르면 끄고, 다음 "code" 응답이 새 버튼으로 다시 그린다
+function rescanBar(): HTMLElement {
+  const bar = document.createElement("div");
+  bar.className = "code-bar";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "다시 찾기";
+  button.title = "워크스페이스에서 마커를 다시 찾아 앵커를 맞춥니다 (git pull 등 VSCode 밖 변경 반영)";
+  button.addEventListener("click", () => {
+    button.disabled = true;
+    button.textContent = "찾는 중…";
+    api.postMessage({ type: "rescan" });
+  });
+  bar.appendChild(button);
+  return bar;
 }
 
 function byId<T extends Element>(id: string): T {

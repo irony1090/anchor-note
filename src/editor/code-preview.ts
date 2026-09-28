@@ -28,7 +28,7 @@ export async function codeBlocks(label: string, meta: NoteMeta): Promise<CodeBlo
       for (let i = start; i < end; i++) {
         lines.push(doc.lineAt(i).text);
       }
-      const missing = anchor.kind === "marker" && focus === null ? "마커를 찾지 못했습니다 (파일 앞부분)" : undefined;
+      const missing = anchor.kind === "marker" && focus === null ? "마커를 찾지 못했습니다 (파일 앞부분) — 위 [다시 찾기]로 앵커를 맞출 수 있습니다" : undefined;
       blocks.push({ path: anchor.path, id: anchor.kind === "marker" ? anchor.id : undefined, start, lines, focus, missing });
     } catch (error) {
       blocks.push({ path: anchor.path, start: 0, lines: [], focus: null, missing: describe(error) });
