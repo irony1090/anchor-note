@@ -115,3 +115,16 @@ test("dropFileAnchor: 그 경로의 file 앵커만 빼고, 없으면 null", () =
   assert.equal(dropFileAnchor(anchors, "c.txt"), null);
   assert.deepEqual(fileAnchor("x.csv"), { kind: "file", path: "x.csv" });
 });
+
+test("link(D27)는 스캔·이름 변경을 거쳐도 남는다", () => {
+  const linked: Anchor = { kind: "marker", path: "src/a.c", id: "u1", link: { block: "baud", hash: "h" } };
+  const anchors = [linked, m("src/b.c")];
+  assert.equal(syncFileAnchors(anchors, "src/a.c", ids("u1")), null);
+  assert.deepEqual(syncFileAnchors(anchors, "src/a.c", ids("u1", "u2"))?.[0], linked);
+  assert.deepEqual(rescanAnchors(anchors, new Map([["src/a.c", ids("u1")]]))[0], linked);
+  assert.deepEqual(renameAnchors(anchors, "src", "lib")?.[0], { ...linked, path: "lib/a.c" });
+});
+
+test("sameAnchor: link는 구분 키가 아니다", () => {
+  assert.ok(sameAnchor({ kind: "marker", path: "a", link: { hash: "1" } }, m("a")));
+});

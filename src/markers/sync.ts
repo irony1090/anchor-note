@@ -11,17 +11,30 @@ export const RESCAN = "anchorNotes.rescan";
 type Plan = (anchors: Anchor[]) => Anchor[] | null;
 
 // 소스 파일 저장·이름 변경·삭제 -> 노트 anchors 동기화, 그리고 "Rescan Workspace" (R5 마커 스캔)
+/*
+ * anchors를 읽고 -> 쓰는 작업은 전부 이 체인 하나로 순서대로 돈다 (틀리면 앵커가 사라진다).
+ * 두 작업이 겹치면 뒤 작업이 앞 작업의 쓰기 전 값을 읽어 앞 작업의 변경을 덮는다(연속 저장, 폴더 이름 변경 중 저장,
+ * R11 연결 정보 쓰기와 저장 동기화 등). 스캔 밖에서 anchors를 고치는 곳(features/code-link 등)도 이걸 쓴다.
+ */
+let chain: Promise<void> = Promise.resolve();
+
+// 스캔 작업용: 실패는 로그만 남기고 체인을 잇는다
+function run(task: () => Promise<unknown>): Promise<void> {
+  chain = chain.then(async () => void (await task())).catch((error) => console.error("[anchor-notes] sync failed", error));
+  return chain;
+}
+
+// 체인에 줄을 세워 돌리고 결과·실패를 부른 쪽에 그대로 돌려준다
+export function runAnchorTask<T>(task: () => Promise<T>): Promise<T> {
+  const result = chain.then(task);
+  chain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 export function registerSync(store: NoteStore): vscode.Disposable[] {
-  /*
-   * 모든 동기화 작업은 이 체인 하나로 순서대로 돈다 (틀리면 앵커가 사라진다).
-   * 각 작업은 store의 anchors를 읽고 -> writeMeta로 쓰는데, 두 작업이 겹치면 뒤 작업이 앞 작업의 쓰기 전 값을 읽어
-   * 앞 작업의 변경을 덮는다(연속 저장, 폴더 이름 변경 중 저장 등).
-   */
-  let chain: Promise<void> = Promise.resolve();
-  const run = (task: () => Promise<unknown>) => {
-    chain = chain.then(async () => void (await task())).catch((error) => console.error("[anchor-notes] sync failed", error));
-    return chain;
-  };
 
   // 라벨 수집은 이벤트 시점에 한다. 큐에서 기다리는 사이 문서가 또 바뀌어도 저장된 내용 기준이 되게
   const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {

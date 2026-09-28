@@ -60,7 +60,8 @@ export async function removeMarkers(uris: vscode.Uri[], labels: ReadonlySet<stri
 export function planRenameMarkers(edit: vscode.WorkspaceEdit, uris: vscode.Uri[], from: string, to: string): Promise<MarkerPlan> {
   const prefixLength = markerPrefix().length;
   return planMarkerLines(edit, uris, new Set([from]), (text, hit) => {
-    const labelStart = hit.start + prefixLength;
+    // 닫는 마커는 라벨 앞에 `/`가 있다 (D26 범위 닫는 마커)
+    const labelStart = hit.start + prefixLength + (hit.close === true ? 1 : 0);
     return `${text.slice(0, labelStart)}${to}${text.slice(labelStart + hit.label.length)}`;
   });
 }

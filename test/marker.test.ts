@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { markerText, markersIn, partialMarkerAt } from "../src/core/marker";
+import { closeMarkerText, markerText, markersIn, partialMarkerAt } from "../src/core/marker";
 
 const P = "@note:";
 
@@ -69,4 +69,35 @@ test("markerText: id가 있으면 `라벨#id`, markersIn으로 되읽힌다", ()
   assert.equal(markerText("cache-scan", P), "@note:cache-scan");
   assert.equal(markerText("cache-scan", P, "fix"), "@note:cache-scan#fix");
   assert.deepEqual(markersIn(`// ${markerText("a", P, "x")}`, P), [{ label: "a", id: "x", start: 3, end: 12 }]);
+});
+
+test("markersIn: 닫는 마커 `@note:/라벨[#id]` (D26)", () => {
+  assert.deepEqual(markersIn("// @note:/uart", P), [{ label: "uart", start: 3, end: 14, close: true }]);
+  assert.deepEqual(markersIn("// @note:/uart#u1", P), [{ label: "uart", id: "u1", start: 3, end: 17, close: true }]);
+});
+
+test("markersIn: 여는·닫는 마커가 한 줄에", () => {
+  assert.deepEqual(
+    markersIn("/* @note:a */ x /* @note:/a */", P).map((hit) => [hit.label, hit.close === true]),
+    [
+      ["a", false],
+      ["a", true],
+    ],
+  );
+});
+
+test("markersIn: `/` 뒤도 덩어리 전체가 유효해야", () => {
+  for (const line of ["@note:/", "@note://a", "@note:/a/b", "@note:/a#", "@note:/a."]) {
+    assert.deepEqual(markersIn(line, P), [], line);
+  }
+});
+
+test("closeMarkerText: markersIn으로 되읽힌다", () => {
+  assert.equal(closeMarkerText("a", P), "@note:/a");
+  assert.equal(closeMarkerText("a", P, "x"), "@note:/a#x");
+  assert.deepEqual(markersIn(`// ${closeMarkerText("a", P, "x")}`, P), [{ label: "a", id: "x", start: 3, end: 13, close: true }]);
+});
+
+test("partialMarkerAt: 닫는 마커 `/` 뒤는 자동완성 안 함", () => {
+  assert.equal(partialMarkerAt("// @note:/ua", P), null);
 });

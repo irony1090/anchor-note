@@ -32,8 +32,8 @@ export function registerInsertCode(store: NoteStore): vscode.Disposable {
   });
 }
 
-// 기존 메모만. 설명에 코드 블록 수
-async function pickNote(store: NoteStore): Promise<string | undefined> {
+// 기존 메모만. 설명에 코드 블록 수. title은 QuickPick 제목
+export async function pickNote(store: NoteStore, title = "메모 코드 넣기 - 메모"): Promise<string | undefined> {
   const items = store
     .labels()
     .sort((a, b) => a.localeCompare(b))
@@ -51,7 +51,7 @@ async function pickNote(store: NoteStore): Promise<string | undefined> {
     void vscode.window.showInformationMessage("메모가 없습니다");
     return undefined;
   }
-  const picked = await vscode.window.showQuickPick(items, { title: "메모 코드 넣기 - 메모", matchOnDescription: true });
+  const picked = await vscode.window.showQuickPick(items, { title, matchOnDescription: true });
   return picked?.label;
 }
 

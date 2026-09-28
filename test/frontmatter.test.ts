@@ -179,3 +179,60 @@ test("updatedEdit: 있으면 교체, 없으면 닫는 --- 앞에 삽입", () => 
   assert.deepEqual(updatedEdit("---\na: 1\n---\n", "NOW"), { start: 9, end: 9, text: "updated: NOW\n" });
   assert.equal(updatedEdit("body", "NOW"), null);
 });
+
+test("parseNote: 동기화 정보 link (D27) — 줄 단위·열 단위", () => {
+  const { meta } = parseNote(
+    note(
+      "anchors:",
+      "  - marker: src/main.c",
+      "    block: init",
+      "    hash: 0be4c8d9",
+      "  - marker: src/uart.c",
+      "    id: u1",
+      "    block: baud",
+      '    prefix: ".baud_rate = "',
+      '    suffix: ","',
+      "    hash: 7c2e91a0",
+      "  - marker: src/plain.c",
+    ),
+    "uart",
+  );
+  assert.deepEqual(meta.anchors, [
+    { kind: "marker", path: "src/main.c", link: { block: "init", hash: "0be4c8d9" } },
+    { kind: "marker", path: "src/uart.c", id: "u1", link: { block: "baud", prefix: ".baud_rate = ", suffix: ",", hash: "7c2e91a0" } },
+    { kind: "marker", path: "src/plain.c" },
+  ]);
+});
+
+test("parseNote: hash 없는 link는 hash \"\" · 빈 prefix는 \"있음\"", () => {
+  const { meta } = parseNote(note("anchors:", "  - marker: a.c", '    prefix: ""', '    suffix: ";"'), "a");
+  assert.deepEqual(meta.anchors, [{ kind: "marker", path: "a.c", link: { prefix: "", suffix: ";", hash: "" } }]);
+});
+
+test("serializeMeta: link는 block·prefix·suffix·hash 순, 코드 조각은 겹따옴표로 왕복", () => {
+  const tricky = ['a: b # c "q" \\ x', "  lead", "tail  ", "", "line1\nline2", "- dash", "{x}", "'s'"];
+  for (const prefix of tricky) {
+    const meta: NoteMeta = {
+      title: "t",
+      anchors: [{ kind: "marker", path: "src/a.c", id: "u1", link: { block: "baud", prefix, suffix: ");", hash: "abc12345" } }],
+      created: "",
+      updated: "",
+      extra: [],
+    };
+    const text = `${serializeMeta("a", meta)}body`;
+    assert.deepEqual(parseNote(text, "a").meta.anchors, meta.anchors, JSON.stringify(prefix));
+  }
+  const head = serializeMeta("a", {
+    title: "a",
+    anchors: [{ kind: "marker", path: "x.c", link: { block: "b", prefix: "p(", suffix: ")", hash: "h" } }],
+    created: "",
+    updated: "",
+    extra: [],
+  });
+  assert.equal(head, ["---", "label: a", "title: a", "anchors:", "  - marker: x.c", "    block: b", "    prefix: p(", "    suffix: )", "    hash: h", "---", ""].join("\n"));
+});
+
+test("serializeMeta: file 앵커에는 link를 쓰지 않는다", () => {
+  const head = serializeMeta("a", { title: "a", anchors: [{ kind: "file", path: "x.json" }], created: "", updated: "", extra: [] });
+  assert.ok(!head.includes("hash"));
+});

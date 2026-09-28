@@ -56,11 +56,11 @@ function targetColumn(uri: vscode.Uri, memoColumn: vscode.ViewColumn | undefined
   return shown?.viewColumn ?? (memoColumn === vscode.ViewColumn.One ? vscode.ViewColumn.Two : vscode.ViewColumn.One);
 }
 
-// 이 라벨·이 id(undefined = id 없는 마커)의 첫 마커 글자 범위
+// 이 라벨·이 id(undefined = id 없는 마커)의 첫 여는 마커 글자 범위. 닫는 마커(D26)로는 가지 않는다
 function findMarker(doc: vscode.TextDocument, label: string, id: string | undefined): vscode.Range | null {
   const prefix = markerPrefix();
   for (let i = 0; i < doc.lineCount; i++) {
-    const hit = markersIn(doc.lineAt(i).text, prefix).find((h) => h.label === label && h.id === id);
+    const hit = markersIn(doc.lineAt(i).text, prefix).find((h) => h.label === label && h.id === id && h.close !== true);
     if (hit !== undefined) {
       return new vscode.Range(i, hit.start, i, hit.end);
     }

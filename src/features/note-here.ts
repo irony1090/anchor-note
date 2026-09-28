@@ -127,7 +127,7 @@ async function ensureNote(store: NoteStore, label: string, path: string, id: str
 }
 
 // 이 파일에 id 없는 같은 라벨 마커가 이미 있으면 id를 받는다 (D24 마커 id). 없으면 undefined(id 없이 넣음), 취소하면 null
-async function askId(doc: vscode.TextDocument, label: string): Promise<string | undefined | null> {
+export async function askId(doc: vscode.TextDocument, label: string): Promise<string | undefined | null> {
   const lines = Array.from({ length: doc.lineCount }, (_, i) => doc.lineAt(i).text);
   const ids = labelsInLines(lines, markerPrefix()).get(label);
   if (ids === undefined || !ids.has(undefined)) {

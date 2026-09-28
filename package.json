@@ -95,6 +95,11 @@
         "command": "anchorNotes.insertCode",
         "title": "메모 코드 넣기",
         "category": "Anchor Notes"
+      },
+      {
+        "command": "anchorNotes.linkCode",
+        "title": "메모 코드와 연결 (동기화)",
+        "category": "Anchor Notes"
       }
     ],
     "keybindings": [
@@ -111,6 +116,11 @@
           "command": "anchorNotes.insertCode",
           "when": "editorTextFocus && !editorReadonly",
           "group": "7_anchorNotes@1"
+        },
+        {
+          "command": "anchorNotes.linkCode",
+          "when": "editorTextFocus && !editorReadonly",
+          "group": "7_anchorNotes@2"
         }
       ],
       "commandPalette": [

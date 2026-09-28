@@ -7,7 +7,19 @@
 const FENCE = "---";
 
 // 앵커 종류 = frontmatter 키 이름 `- marker:` / `- file:` (D25 앵커 종류는 키 이름). path는 워크스페이스 상대경로 (D8 마크다운 저장)
-export type Anchor = { kind: "marker"; path: string; id?: string } | { kind: "file"; path: string };
+export type Anchor = { kind: "marker"; path: string; id?: string; link?: CodeLink } | { kind: "file"; path: string };
+
+// 동기화 정보 (D27 동기화 정보는 앵커 항목에). prefix·suffix가 있으면 열 단위, 없으면 줄 단위 — 빈 문자열("")도 "있음"이다
+export interface CodeLink {
+  // 메모 코드 블록 이름. 없으면 메모에 블록이 하나뿐일 때 그 블록
+  block?: string;
+  prefix?: string;
+  suffix?: string;
+  // 마지막으로 맞춘 슬롯 내용의 해시. 없던 항목을 읽으면 "" (어떤 내용과도 안 맞음)
+  hash: string;
+}
+
+const LINK_KEYS = ["block", "prefix", "suffix", "hash"] as const;
 
 export interface NoteMeta {
   title: string;
@@ -109,6 +121,14 @@ export function serializeMeta(label: string, meta: NoteMeta, eol = "\n"): string
       if (anchor.kind === "marker" && anchor.id !== undefined) {
         lines.push(`    id: ${emit(anchor.id)}`);
       }
+      if (anchor.kind === "marker" && anchor.link !== undefined) {
+        for (const key of LINK_KEYS) {
+          const value = anchor.link[key];
+          if (value !== undefined) {
+            lines.push(`    ${key}: ${emit(value)}`);
+          }
+        }
+      }
     }
   }
 
@@ -199,7 +219,8 @@ function emit(value: string): string {
 }
 
 function needsQuote(value: string): boolean {
-  if (value === "" || value !== value.trim()) {
+  // 제어문자(줄바꿈·탭)는 겹따옴표 안에서만 이스케이프된다. 그대로 쓰면 frontmatter 줄이 쪼개진다
+  if (value === "" || value !== value.trim() || /[\u0000-\u001f]/.test(value)) {
     return true;
   }
   if (/^(null|true|false|yes|no|on|off|~)$/i.test(value) || /^[-+]?[\d.]+$/.test(value)) {
@@ -268,11 +289,31 @@ function toAnchor(entry: Map<string, string>, legacyKind: "marker" | "file"): An
   }
   if (marker !== undefined) {
     const id = scalar(entry.get("id") ?? "");
-    return id === "" ? { kind: "marker", path: scalar(marker) } : { kind: "marker", path: scalar(marker), id };
+    const anchor: Anchor = id === "" ? { kind: "marker", path: scalar(marker) } : { kind: "marker", path: scalar(marker), id };
+    const link = toLink(entry);
+    if (link !== undefined) {
+      anchor.link = link;
+    }
+    return anchor;
   }
   const path = entry.get("path");
   if (path === undefined) {
     throw new BrokenNoteError("anchors 항목에 marker·file·path가 없다");
   }
   return { kind: legacyKind, path: scalar(path) };
+}
+
+// 키가 하나라도 있으면 연결. 값은 따옴표를 벗긴 그대로 — 코드 조각이라 공백·`:`·`#`이 흔하다 (emit이 겹따옴표로 쓴다)
+function toLink(entry: Map<string, string>): CodeLink | undefined {
+  if (!LINK_KEYS.some((key) => entry.has(key))) {
+    return undefined;
+  }
+  const link: CodeLink = { hash: scalar(entry.get("hash") ?? "") };
+  for (const key of ["block", "prefix", "suffix"] as const) {
+    const raw = entry.get(key);
+    if (raw !== undefined) {
+      link[key] = scalar(raw);
+    }
+  }
+  return link;
 }

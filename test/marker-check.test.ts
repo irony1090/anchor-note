@@ -28,3 +28,16 @@ test("markerIssues: 위치는 마커 범위 (hit)", () => {
   const [issue] = markerIssues(["x @note:a", "y  @note:a"], P);
   assert.deepEqual(issue.hit, { label: "a", start: 3, end: 10 });
 });
+
+test("markerIssues: 닫는 마커는 D24 중복이 아니다", () => {
+  assert.deepEqual(markerIssues(["// @note:a", "x", "// @note:/a", "// @note:b#i", "// @note:/b#i"], P), []);
+});
+
+test("markerIssues: 범위 오류 orphan·overlap을 줄 순서로 섞어 낸다", () => {
+  assert.deepEqual(brief(["@note:/z", "@note:a", "@note:b#i", "@note:/a", "@note:/b#i", "@note:a"]), [
+    { line: 0, marker: "z", kind: "orphan", used: [] },
+    { line: 1, marker: "a", kind: "overlap", used: [] },
+    { line: 2, marker: "b#i", kind: "overlap", used: [] },
+    { line: 5, marker: "a", kind: "bare", used: [] },
+  ]);
+});
