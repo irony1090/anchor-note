@@ -2,7 +2,8 @@
 
 import { marked } from "marked";
 import { tagSpans, tagsIn } from "../src/core/tag";
-import type { CodeBlock, EditorToHost, HostToEditor } from "../src/editor/protocol";
+import type { EditorToHost, HostToEditor } from "../src/editor/protocol";
+import type { Anchor } from "../src/notes/frontmatter";
 import { Splitters } from "./splitters";
 import { TagComplete } from "./tag-complete";
 
@@ -45,8 +46,7 @@ marked.use({
 const api = acquireVsCodeApi();
 const titleEl = byId<HTMLSpanElement>("title");
 const labelEl = byId<HTMLSpanElement>("label");
-const toggle = byId<HTMLInputElement>("show-code");
-const codeEl = byId<HTMLElement>("code");
+const anchorsEl = byId<HTMLElement>("anchors");
 const previewEl = byId<HTMLElement>("preview");
 const errorEl = byId<HTMLParagraphElement>("error");
 const input = byId<HTMLTextAreaElement>("input");
@@ -55,13 +55,22 @@ const renameButton = byId<HTMLButtonElement>("rename");
 const titleInput = byId<HTMLInputElement>("title-input");
 const tagsEl = byId<HTMLDivElement>("tags");
 const tagComplete = new TagComplete(input, byId<HTMLUListElement>("tag-popup"));
-const splitCode = byId<HTMLDivElement>("split-code");
-const splitters = new Splitters({ code: codeEl, preview: previewEl, input }, (layout) =>
+const splitters = new Splitters({ anchors: anchorsEl, preview: previewEl, input }, (layout) =>
   api.postMessage({ type: "layout", layout }),
 );
 
-const saved = api.getState() as { showCode?: boolean } | undefined;
-toggle.checked = saved?.showCode === true;
+// 앵커 칩 줄 끝의 [다시 찾기]. 밖에서 새로 생긴 마커는 칩이 없어 이 버튼으로 맞춘다 (REF-browse 2절).
+// 누르면 끄고 "rescanned"에서 다시 켠다. 바뀐 앵커는 doc 메시지로 따로 와 칩을 다시 그린다
+const rescanButton = document.createElement("button");
+rescanButton.type = "button";
+rescanButton.id = "rescan";
+rescanButton.textContent = "다시 찾기";
+rescanButton.title = "워크스페이스에서 마커를 다시 찾아 앵커를 맞춥니다 (git pull 등 VSCode 밖 변경 반영)";
+rescanButton.addEventListener("click", () => {
+  rescanButton.disabled = true;
+  rescanButton.textContent = "찾는 중…";
+  api.postMessage({ type: "rescan" });
+});
 
 input.addEventListener("input", () => {
   renderPreview(input.value);
@@ -113,11 +122,6 @@ titleInput.addEventListener("blur", () => {
   }
 });
 
-toggle.addEventListener("change", () => {
-  api.setState({ showCode: toggle.checked });
-  syncCode();
-});
-
 previewEl.addEventListener("click", (event) => {
   // 웹뷰 안에서 링크를 따라가면 에디터가 통째로 날아간다
   if (event.target instanceof HTMLAnchorElement) {
@@ -139,10 +143,12 @@ window.addEventListener("message", (event: MessageEvent<HostToEditor>) => {
         input.value = message.body;
       }
       renderPreview(message.body);
+      renderAnchors(message.anchors);
       errorEl.hidden = true;
       return;
-    case "code":
-      renderCode(message.blocks);
+    case "rescanned":
+      rescanButton.disabled = false;
+      rescanButton.textContent = "다시 찾기";
       return;
     case "error":
       errorEl.textContent = message.message;
@@ -163,16 +169,6 @@ window.addEventListener("message", (event: MessageEvent<HostToEditor>) => {
 });
 
 api.postMessage({ type: "ready" });
-syncCode();
-
-function syncCode(): void {
-  codeEl.hidden = !toggle.checked;
-  splitCode.hidden = !toggle.checked;
-  splitters.setCodeVisible(toggle.checked);
-  if (toggle.checked) {
-    api.postMessage({ type: "requestCode" });
-  }
-}
 
 function renderPreview(body: string): void {
   renderTags(body);
@@ -214,70 +210,33 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-function renderCode(blocks: CodeBlock[]): void {
-  codeEl.replaceChildren(rescanBar());
-  if (blocks.length === 0) {
-    const none = document.createElement("p");
-    none.className = "code-none";
-    none.textContent = "앵커가 없습니다";
-    codeEl.appendChild(none);
-    return;
-  }
-
-  for (const block of blocks) {
-    const wrap = document.createElement("div");
-    wrap.className = "code-block";
-
-    const head = document.createElement("button");
-    head.type = "button";
-    head.className = "code-path";
-    head.textContent = `${block.path}${block.focus === null ? "" : `:${block.focus + 1}`}${block.id === undefined ? "" : ` #${block.id}`}`;
-    head.title = "에디터에서 열기";
-    head.addEventListener("click", () =>
-      api.postMessage({ type: "reveal", path: block.path, line: block.focus ?? block.start }),
-    );
-    wrap.appendChild(head);
-
-    if (block.missing !== undefined) {
-      const warn = document.createElement("p");
-      warn.className = "code-missing";
-      warn.textContent = block.missing;
-      wrap.appendChild(warn);
+// 헤더 아래 앵커 칩 줄. 노트 anchors만 보고 그린다(파일을 안 읽음). 칩을 누르면 호스트가 그때 마커 줄을 찾아 연다
+function renderAnchors(anchors: Anchor[]): void {
+  const chips: HTMLElement[] = anchors.map((anchor) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `anchor-chip ${anchor.kind}`;
+    const id = anchor.kind === "marker" && anchor.id !== undefined ? ` #${anchor.id}` : "";
+    chip.title = anchor.kind === "file" ? `파일 앵커: ${anchor.path}` : `${anchor.path}${id} 마커로 이동`;
+    const cut = anchor.path.lastIndexOf("/") + 1;
+    chip.append(span("anchor-dir", anchor.path.slice(0, cut)), span("anchor-base", anchor.path.slice(cut)));
+    if (id !== "") {
+      chip.append(span("anchor-id", id));
     }
-
-    const pre = document.createElement("pre");
-    block.lines.forEach((text, i) => {
-      const lineNo = block.start + i;
-      const row = document.createElement("div");
-      row.className = `code-line${lineNo === block.focus ? " focus" : ""}`;
-      const num = document.createElement("span");
-      num.className = "code-num";
-      num.textContent = String(lineNo + 1);
-      row.appendChild(num);
-      row.appendChild(document.createTextNode(text));
-      pre.appendChild(row);
-    });
-    wrap.appendChild(pre);
-    codeEl.appendChild(wrap);
+    chip.addEventListener("click", () => api.postMessage({ type: "openAnchor", anchor }));
+    return chip;
+  });
+  if (chips.length === 0) {
+    chips.push(span("anchor-none", "앵커가 없습니다"));
   }
+  anchorsEl.replaceChildren(...chips, rescanButton);
 }
 
-// 코드 보기 머리의 [다시 찾기]. 밖에서 옮긴 마커(못 찾음)와 새로 생긴 마커(안내 없음)를 둘 다 덮으려고 항상 둔다.
-// 누르면 끄고, 다음 "code" 응답이 새 버튼으로 다시 그린다
-function rescanBar(): HTMLElement {
-  const bar = document.createElement("div");
-  bar.className = "code-bar";
-  const button = document.createElement("button");
-  button.type = "button";
-  button.textContent = "다시 찾기";
-  button.title = "워크스페이스에서 마커를 다시 찾아 앵커를 맞춥니다 (git pull 등 VSCode 밖 변경 반영)";
-  button.addEventListener("click", () => {
-    button.disabled = true;
-    button.textContent = "찾는 중…";
-    api.postMessage({ type: "rescan" });
-  });
-  bar.appendChild(button);
-  return bar;
+function span(className: string, text: string): HTMLSpanElement {
+  const el = document.createElement("span");
+  el.className = className;
+  el.textContent = text;
+  return el;
 }
 
 function byId<T extends Element>(id: string): T {

@@ -22,7 +22,7 @@ body {
 }
 
 /* 세 영역은 grid 칸을 꽉 채운다. drag()가 영역 높이 = 칸 높이로 보고 잰다 */
-#code,
+#anchors,
 #preview,
 #input {
   box-sizing: border-box;
@@ -30,15 +30,14 @@ body {
   min-height: 0;
 }
 
-/* 헤더는 세 묶음(제목·라벨 / 태그 / 동작). 좁아지면 묶음 단위로 줄을 넘긴다 */
+/* 헤더는 세 묶음(제목·라벨 / 태그 / 동작). 좁아지면 묶음 단위로 줄을 넘긴다. 아래 선은 앵커 칩 줄의 손잡이가 긋는다 */
 #head {
   grid-row: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 12px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--vscode-panel-border);
+  padding: 6px 12px 2px;
 }
 
 .head-part {
@@ -89,17 +88,9 @@ body {
   white-space: nowrap;
 }
 
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  color: var(--vscode-descriptionForeground);
-}
-
 #rename,
 #delete,
-.code-bar button {
+#rescan {
   background: none;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 2px;
@@ -110,7 +101,7 @@ body {
 }
 
 #rename:hover,
-.code-bar button:hover:enabled {
+#rescan:hover:enabled {
   color: var(--vscode-foreground);
   border-color: var(--vscode-focusBorder);
 }
@@ -120,73 +111,65 @@ body {
   border-color: var(--vscode-errorForeground);
 }
 
-/* --- 코드 미리보기 (옵션) --- */
+/* --- 앵커 칩 (헤더 아래 줄) --- */
 
-#code {
+/* 행 높이는 fit-content(최대 px) — 넘치면 이 안에서 스크롤 */
+#anchors {
   grid-row: 3;
   overflow: auto;
-  padding: 6px 12px;
-}
-
-.code-bar {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 4px 6px;
+  padding: 4px 12px;
 }
 
-.code-bar button:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.code-block + .code-block {
-  margin-top: 8px;
-}
-
-.code-path {
+.anchor-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0 7px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
   background: none;
-  border: none;
-  padding: 0;
   color: var(--vscode-textLink-foreground);
   font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 
-.code-path:hover {
+.anchor-chip:hover {
+  border-color: var(--vscode-focusBorder);
+}
+
+.anchor-chip:hover .anchor-base {
   text-decoration: underline;
 }
 
-.code-missing,
-.code-none {
-  margin: 2px 0;
-  color: var(--vscode-editorWarning-foreground);
+/* 파일 앵커는 점선·본문색으로 마커 앵커와 구분 */
+.anchor-chip.file {
+  border-style: dashed;
+  color: var(--vscode-foreground);
 }
 
-#code pre {
-  margin: 4px 0 0;
-  padding: 4px 0;
-  background-color: var(--vscode-textCodeBlock-background);
-  font-family: var(--vscode-editor-font-family);
-  font-size: var(--vscode-editor-font-size);
-  overflow-x: auto;
+.anchor-dir,
+.anchor-id,
+.anchor-none {
+  color: var(--vscode-descriptionForeground);
 }
 
-.code-line {
-  white-space: pre;
-  padding-right: 8px;
+#rescan {
+  margin-left: auto;
 }
 
-.code-line.focus {
-  background-color: var(--vscode-editor-lineHighlightBackground, var(--vscode-editor-selectionHighlightBackground));
-}
-
-.code-num {
-  display: inline-block;
-  min-width: 3em;
-  padding-right: 8px;
-  text-align: right;
-  color: var(--vscode-editorLineNumber-foreground);
-  user-select: none;
+#rescan:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* --- 미리보기 --- */
@@ -258,7 +241,7 @@ body {
 
 /* --- 크기 조절 손잡이 --- */
 
-#split-code {
+#split-anchors {
   grid-row: 4;
 }
 

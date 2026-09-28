@@ -3,9 +3,10 @@ import { DELETE_NOTE } from "../features/delete";
 import { RENAME_NOTE } from "../features/rename";
 import { FIND_BY_TAG } from "../features/tag-search";
 import { RESCAN } from "../markers/sync";
-import { BrokenNoteError, bodyOffset, parseNote } from "../notes/frontmatter";
+import { bodyOffset, parseNote } from "../notes/frontmatter";
+import type { Anchor } from "../notes/frontmatter";
 import type { NoteStore } from "../notes/store";
-import { codeBlocks, reveal } from "./code-preview";
+import { openAnchor } from "./open-anchor";
 import type { EditorToHost, HostToEditor, Layout } from "./protocol";
 
 export const NOTE_EDITOR_VIEW_TYPE = "anchorNotes.noteEditor";
@@ -91,7 +92,8 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
     panel.webview.onDidReceiveMessage(async (message: EditorToHost) => {
       switch (message.type) {
         case "ready": {
-          const layout = this.globalState.get<Layout>(LAYOUT_KEY);
+          // 옛 형식({code, preview, input})일 수 있다. 웹뷰가 아는 키만 골라 쓴다
+          const layout = this.globalState.get<Partial<Layout>>(LAYOUT_KEY);
           if (layout !== undefined) {
             post({ type: "layout", layout });
           }
@@ -105,19 +107,16 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
         case "edit":
           applyBody(message.body);
           return;
-        case "requestCode":
-          post({ type: "code", blocks: await this.codeFor(document, label) });
+        case "openAnchor":
+          await openAnchor(label, message.anchor, panel.viewColumn);
           return;
         case "rescan":
-          // 다시 찾기가 노트 anchors를 고친 뒤 읽어야 한다. 취소·실패해도 보내야 웹뷰 버튼이 다시 켜진다
+          // 바뀐 앵커는 노트 문서 변경 -> sendDoc으로 간다. 이건 버튼을 다시 켜는 신호라 취소·실패해도 보낸다
           try {
             await vscode.commands.executeCommand(RESCAN);
           } finally {
-            post({ type: "code", blocks: await this.codeFor(document, label) });
+            post({ type: "rescanned" });
           }
-          return;
-        case "reveal":
-          await reveal(message.path, message.line, panel.viewColumn);
           return;
         case "delete":
           await vscode.commands.executeCommand(DELETE_NOTE, label);
@@ -142,16 +141,6 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
         }
       }
     });
-  }
-
-  // 저장 안 한 frontmatter(방금 추가된 앵커 포함)를 보려고 디스크가 아니라 문서를 읽는다
-  private async codeFor(document: vscode.TextDocument, label: string) {
-    try {
-      return await codeBlocks(label, parseNote(document.getText(), label).meta);
-    } catch (error) {
-      const message = error instanceof BrokenNoteError ? error.message : String(error);
-      return [{ path: "(frontmatter)", start: 0, lines: [], focus: null, missing: message }];
-    }
   }
 
   private buildHtml(webview: vscode.Webview): string {
@@ -179,14 +168,13 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
     <div class="head-part head-name"><span id="title" title="클릭해서 제목 편집"></span><input id="title-input" type="text" hidden><span id="label"></span></div>
     <div class="head-part" id="tags"></div>
     <div class="head-part head-actions">
-      <label class="toggle"><input type="checkbox" id="show-code"> 코드 보기</label>
       <button type="button" id="rename" title="라벨 이름 바꾸기 (노트 파일과 모든 마커)">이름 변경</button>
       <button type="button" id="delete" title="메모 삭제">삭제</button>
     </div>
   </header>
   <p id="error" hidden></p>
-  <section id="code" hidden></section>
-  <div class="splitter" id="split-code" data-between="code,preview" title="드래그로 크기 조절 · 더블클릭으로 기본값" hidden></div>
+  <nav id="anchors" aria-label="앵커"></nav>
+  <div class="splitter" id="split-anchors" title="드래그로 앵커 영역 최대 높이 조절 · 더블클릭으로 기본값"></div>
   <section id="preview"></section>
   <div class="splitter" id="split-input" data-between="preview,input" title="드래그로 크기 조절 · 더블클릭으로 기본값"></div>
   <textarea id="input" spellcheck="false" placeholder="마크다운으로 메모를 쓰세요. #태그 · 저장은 Ctrl+S"></textarea>
@@ -212,15 +200,17 @@ function bodyRange(document: vscode.TextDocument): vscode.Range | null {
   return new vscode.Range(document.positionAt(offset), document.lineAt(document.lineCount - 1).range.end);
 }
 
-function readDoc(document: vscode.TextDocument, label: string): { label: string; title: string; body: string } {
+// 저장 안 한 frontmatter(방금 추가된 앵커 포함)를 보려고 디스크가 아니라 문서를 읽는다
+function readDoc(document: vscode.TextDocument, label: string): { label: string; title: string; body: string; anchors: Anchor[] } {
   const range = bodyRange(document);
   let title = label;
+  let anchors: Anchor[] = [];
   try {
-    title = parseNote(document.getText(), label).meta.title;
+    ({ title, anchors } = parseNote(document.getText(), label).meta);
   } catch {
-    // 제목만 못 읽은 것. 본문은 range로 따로 자른다
+    // frontmatter만 못 읽은 것. 본문은 range로 따로 자른다
   }
-  return { label, title, body: range === null ? document.getText() : document.getText(range) };
+  return { label, title, body: range === null ? document.getText() : document.getText(range), anchors };
 }
 
 function createNonce(): string {
