@@ -18,7 +18,7 @@ const extensionConfig = {
 };
 
 // 웹뷰 entry. 출력은 dist/{key}.js
-const webviewEntries = { "note-editor": "webview/note-editor.ts" };
+const webviewEntries = { "note-editor": "webview/note-editor.ts", browse: "webview/browse.ts" };
 
 // 웹뷰는 브라우저에서 돌고 <script type="module">로 실려서 esm이어야 한다
 const webviewConfig = {

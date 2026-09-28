@@ -38,6 +38,25 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "anchorNotes",
+          "title": "Anchor Notes",
+          "icon": "media/anchor.svg"
+        }
+      ]
+    },
+    "views": {
+      "anchorNotes": [
+        {
+          "type": "webview",
+          "id": "anchorNotes.browse",
+          "name": "둘러보기",
+          "icon": "media/anchor.svg"
+        }
+      ]
+    },
     "customEditors": [
       {
         "viewType": "anchorNotes.noteEditor",
@@ -64,7 +83,8 @@
       {
         "command": "anchorNotes.rescan",
         "title": "마커 다시 찾기 (Rescan Workspace)",
-        "category": "Anchor Notes"
+        "category": "Anchor Notes",
+        "icon": "$(refresh)"
       },
       {
         "command": "anchorNotes.deleteNote",
@@ -111,6 +131,13 @@
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "anchorNotes.rescan",
+          "when": "view == anchorNotes.browse",
+          "group": "navigation"
+        }
+      ],
       "editor/context": [
         {
           "command": "anchorNotes.insertCode",

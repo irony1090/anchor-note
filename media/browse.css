@@ -1,0 +1,280 @@
+/* 둘러보기 사이드바 (R9 — C 사이드바 웹뷰). 색은 VSCode 테마 변수만 쓴다 */
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-sideBar-background);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:focus-visible,
+.item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.dim {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* 검색 + 파일별/태그별. 목록을 내려도 위에 남는다 */
+#bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 12px 8px;
+  background-color: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, transparent);
+}
+
+#search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+#search::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+#modes {
+  display: flex;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-input-border, #8884));
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#modes button {
+  flex: 1;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+#modes button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+#modes button[aria-pressed="true"] {
+  color: var(--vscode-button-foreground);
+  background-color: var(--vscode-button-background);
+}
+
+.empty {
+  margin: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* 묶음 머리: 접기 + 경로/태그 + 개수 */
+.grp-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 12px 3px 4px;
+  font-size: 11px;
+}
+
+.grp-toggle {
+  flex: none;
+  width: 16px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.grp-path {
+  display: flex;
+  min-width: 0;
+  font-family: var(--vscode-editor-font-family);
+  text-align: left;
+}
+
+.grp-path:hover .path-base {
+  text-decoration: underline;
+}
+
+.path-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+
+.path-base {
+  flex: none;
+  font-weight: 600;
+}
+
+.grp-name {
+  font-weight: 600;
+}
+
+.grp-name.warn {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.grp-count {
+  margin-left: auto;
+  padding-left: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-badge-background);
+}
+
+/* 메모 한 줄: 제목 줄 + 본문 두 줄 */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 12px 5px 24px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+
+.item:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.item.active {
+  border-left-color: var(--vscode-focusBorder);
+  background-color: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.item-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.item-label {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.item-anchors {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.chip {
+  padding: 0 4px;
+  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-textLink-foreground);
+}
+
+.chip:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+  text-decoration: underline;
+}
+
+.item-snip {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--vscode-descriptionForeground);
+}
+
+mark {
+  color: inherit;
+  background-color: var(--vscode-editor-findMatchHighlightBackground);
+  border-radius: 2px;
+}
+
+/* 노트 없는 마커: 라벨·경로:줄 + [메모 만들기] */
+.orphan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 24px;
+}
+
+.orphan:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.orphan-where {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  text-align: left;
+}
+
+.orphan-name {
+  flex: none;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.orphan-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.orphan-where:hover .orphan-path {
+  text-decoration: underline;
+}
+
+.orphan-create {
+  flex: none;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 2px;
+  color: var(--vscode-button-secondaryForeground);
+  background-color: var(--vscode-button-secondaryBackground);
+}
+
+.orphan-create:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}

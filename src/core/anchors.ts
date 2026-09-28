@@ -107,6 +107,6 @@ function idOf(anchor: Anchor): string | undefined {
 }
 
 // path가 dir 자신이거나 그 아래
-function isUnder(path: string, dir: string): boolean {
+export function isUnder(path: string, dir: string): boolean {
   return path === dir || path.startsWith(`${dir}/`);
 }
