@@ -120,6 +120,11 @@
         "command": "anchorNotes.linkCode",
         "title": "메모 코드와 연결 (동기화)",
         "category": "Anchor Notes"
+      },
+      {
+        "command": "anchorNotes.openBrowse",
+        "title": "둘러보기 열기 (메모 찾기)",
+        "category": "Anchor Notes"
       }
     ],
     "keybindings": [
@@ -128,6 +133,34 @@
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "anchorNotes.noteHere",
+        "key": "ctrl+; m",
+        "mac": "cmd+; m",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "anchorNotes.openBrowse",
+        "key": "ctrl+; b",
+        "mac": "cmd+; b"
+      },
+      {
+        "command": "anchorNotes.insertCode",
+        "key": "ctrl+; i",
+        "mac": "cmd+; i",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
+        "command": "anchorNotes.linkCode",
+        "key": "ctrl+; l",
+        "mac": "cmd+; l",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
+        "command": "anchorNotes.rescan",
+        "key": "ctrl+; r",
+        "mac": "cmd+; r"
       }
     ],
     "menus": {

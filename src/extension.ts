@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(...registerNoteHere(store), registerHover(store), registerCompletion(store), ...registerMarkerChecks());
   context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store), ...registerFileNotes(store), ...registerCodeSync(store));
   const loaded = store.load();
-  context.subscriptions.push(registerBrowse(context, store, loaded));
+  context.subscriptions.push(...registerBrowse(context, store, loaded));
   void loaded.then(() => console.log(`[anchor-notes] activated, ${store.labels().length} notes`));
 }
 

@@ -69,6 +69,10 @@ window.addEventListener("message", (event: MessageEvent<HostToBrowse>) => {
     case "active":
       active = message.label;
       break;
+    case "focusSearch":
+      search.focus();
+      search.select();
+      return;
     default: {
       const unhandled: never = message;
       console.error("[anchor-notes] unhandled host message", unhandled);

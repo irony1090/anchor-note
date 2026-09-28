@@ -10,23 +10,43 @@ import type { NoteStore } from "../notes/store";
 import type { BrowseToHost, HostToBrowse } from "./protocol";
 
 export const BROWSE_VIEW = "anchorNotes.browse";
+// 둘러보기를 열고 검색창에 커서 (단축키 Ctrl+; B)
+export const OPEN_BROWSE = "anchorNotes.openBrowse";
 
 // 이 세션에 첫 열기 다시 찾기를 했는지 (REF-browse 2절). 뷰를 숨겼다 다시 보이면 resolve가 또 불려서 밖에 둔다
 let rescanned = false;
 
 // 사이드바 둘러보기 (R9 — C 사이드바 웹뷰). 보조 화면이라 이 뷰를 안 열어도 메모 기능은 다 돈다 (D21 에디터 주도)
-export function registerBrowse(context: vscode.ExtensionContext, store: NoteStore, loaded: Promise<void>): vscode.Disposable {
-  return vscode.window.registerWebviewViewProvider(BROWSE_VIEW, new BrowseViewProvider(context.extensionUri, store, loaded));
+export function registerBrowse(context: vscode.ExtensionContext, store: NoteStore, loaded: Promise<void>): vscode.Disposable[] {
+  const provider = new BrowseViewProvider(context.extensionUri, store, loaded);
+  return [vscode.window.registerWebviewViewProvider(BROWSE_VIEW, provider), vscode.commands.registerCommand(OPEN_BROWSE, () => provider.focusSearch())];
 }
 
 class BrowseViewProvider implements vscode.WebviewViewProvider {
+  private view: vscode.WebviewView | undefined;
+  // 웹뷰 스크립트가 "ready"를 보냈는지. 그 전에 보낸 메시지는 사라질 수 있다
+  private ready = false;
+  private wantSearch = false;
+
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly store: NoteStore,
     private readonly loaded: Promise<void>,
   ) {}
 
+  // 뷰가 처음 뜨는 중이면 ready 때 검색창으로
+  async focusSearch(): Promise<void> {
+    await vscode.commands.executeCommand(`${BROWSE_VIEW}.focus`);
+    if (this.view !== undefined && this.ready) {
+      void this.view.webview.postMessage({ type: "focusSearch" } satisfies HostToBrowse);
+    } else {
+      this.wantSearch = true;
+    }
+  }
+
   resolveWebviewView(view: vscode.WebviewView): void {
+    this.view = view;
+    this.ready = false;
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "dist"), vscode.Uri.joinPath(this.extensionUri, "media")],
@@ -59,14 +79,22 @@ class BrowseViewProvider implements vscode.WebviewViewProvider {
     view.onDidDispose(() => {
       clearTimeout(timer);
       subs.forEach((sub) => sub.dispose());
+      if (this.view === view) {
+        this.view = undefined;
+      }
     });
 
     view.webview.onDidReceiveMessage(async (message: BrowseToHost) => {
       switch (message.type) {
         case "ready":
+          this.ready = true;
           sendNotes();
           sendOrphans();
           sendActive();
+          if (this.wantSearch) {
+            this.wantSearch = false;
+            post({ type: "focusSearch" });
+          }
           return;
         case "openNote":
           await vscode.commands.executeCommand(OPEN_NOTE, message.label);
