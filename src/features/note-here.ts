@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { labelsInLines, markerAnchor } from "../core/anchors";
+import { hasComment } from "../core/comment";
 import { LABEL_RULE_TEXT, isValidLabel, toLabel } from "../core/label";
 import { markerText, markersIn } from "../core/marker";
 import type { MarkerHit } from "../core/marker";
@@ -9,6 +10,8 @@ import type { NoteStore } from "../notes/store";
 
 export const NOTE_HERE = "anchorNotes.noteHere";
 export const OPEN_NOTE = "anchorNotes.openNote";
+// 등록은 features/file-notes.ts (F2 파일에 메모). file-notes가 이 파일을 import하므로 이름은 여기 둔다
+export const NOTE_ON_FILE = "anchorNotes.noteOnFile";
 
 // Ctrl+Alt+M: 줄에 마커가 있으면 그 메모를, 없으면 라벨을 받아 마커를 넣고 메모를 연다 (R3 단축키·hover)
 export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
@@ -46,7 +49,11 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
         return;
       }
 
-      const label = await pickLabel(store, line);
+      if (!hasComment(doc.languageId) && (await preferFileNote())) {
+        await vscode.commands.executeCommand(NOTE_ON_FILE, doc.uri);
+        return;
+      }
+      const label = await pickLabel(store, `${line + 1}번 줄에 붙일 메모`);
       if (label === undefined) {
         return;
       }
@@ -64,7 +71,9 @@ export function registerNoteHere(store: NoteStore): vscode.Disposable[] {
       await ensureNote(store, label, path, id);
       await openNote(label);
     } catch (error) {
-      void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
+      if (!(error instanceof Cancelled)) {
+        void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
+      }
     }
   };
 
@@ -79,8 +88,22 @@ export function noteColumn(uri: vscode.Uri): vscode.ViewColumn | undefined {
   )?.viewColumn;
 }
 
+// 주석을 모르는 파일(JSON 등)에서 마커 대신 파일 앵커를 제안 (F3 주석 모르는 파일 제안). 파일 앵커 = true, 마커 = false, 취소 = Cancelled
+async function preferFileNote(): Promise<boolean> {
+  const file = { label: "$(file) 파일에 메모 붙이기", detail: "마커 없이 파일 자체에 붙인다 (- file: 앵커)" };
+  const marker = { label: "$(edit) 마커만 넣기", detail: "주석 없이 마커 글자만 넣는다. 직접 주석으로 감싸야 한다" };
+  const picked = await vscode.window.showQuickPick([file, marker], { title: "주석 문법을 모르는 파일입니다" });
+  if (picked === undefined) {
+    throw new Cancelled();
+  }
+  return picked === file;
+}
+
+// 사용자 취소. 오류 알림을 띄우지 않는다
+class Cancelled extends Error {}
+
 // 앵커 경로는 첫 폴더 기준 상대경로만 (D8 마크다운 저장). 그 밖의 파일과 노트 파일 자신에는 붙이지 않는다
-function anchorPath(store: NoteStore, uri: vscode.Uri): string {
+export function anchorPath(store: NoteStore, uri: vscode.Uri): string {
   const root = vscode.workspace.workspaceFolders?.[0];
   if (root === undefined) {
     throw new Error("워크스페이스 폴더가 열려 있지 않습니다");
@@ -89,7 +112,7 @@ function anchorPath(store: NoteStore, uri: vscode.Uri): string {
     throw new Error("워크스페이스 첫 폴더 안의 파일에만 메모를 붙일 수 있습니다");
   }
   if (store.labelOf(uri) !== null) {
-    throw new Error("메모 파일에는 마커를 넣지 않습니다");
+    throw new Error("메모 파일에는 메모를 붙이지 않습니다");
   }
   return vscode.workspace.asRelativePath(uri, false);
 }
@@ -144,7 +167,7 @@ interface LabelItem extends vscode.QuickPickItem {
 }
 
 // 기존 라벨 목록 + 친 값은 "새 메모". 공백은 거부하지 않고 안내만 한 뒤 `_`로 바꾼다 (D22 라벨 공백 금지)
-function pickLabel(store: NoteStore, line: number): Promise<string | undefined> {
+export function pickLabel(store: NoteStore, title: string): Promise<string | undefined> {
   const existing: LabelItem[] = store
     .labels()
     .sort((a, b) => a.localeCompare(b))
@@ -154,7 +177,7 @@ function pickLabel(store: NoteStore, line: number): Promise<string | undefined> 
     });
 
   const quickPick = vscode.window.createQuickPick<LabelItem>();
-  quickPick.title = `${line + 1}번 줄에 붙일 메모`;
+  quickPick.title = title;
   quickPick.placeholder = "새 라벨을 입력하거나 기존 메모를 고르세요";
   quickPick.matchOnDescription = true;
   quickPick.items = existing;

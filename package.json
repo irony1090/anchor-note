@@ -80,6 +80,16 @@
         "command": "anchorNotes.renameNote",
         "title": "라벨 이름 바꾸기",
         "category": "Anchor Notes"
+      },
+      {
+        "command": "anchorNotes.noteOnFile",
+        "title": "이 파일에 메모",
+        "category": "Anchor Notes"
+      },
+      {
+        "command": "anchorNotes.detachFile",
+        "title": "이 파일에서 메모 떼기",
+        "category": "Anchor Notes"
       }
     ],
     "keybindings": [
@@ -95,6 +105,30 @@
         {
           "command": "anchorNotes.openNote",
           "when": "false"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "anchorNotes.noteOnFile",
+          "when": "resourceScheme == file && !explorerResourceIsFolder",
+          "group": "7_anchorNotes@1"
+        },
+        {
+          "command": "anchorNotes.detachFile",
+          "when": "resourceScheme == file && !explorerResourceIsFolder && resourcePath in anchorNotes.fileNotePaths",
+          "group": "7_anchorNotes@2"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "anchorNotes.noteOnFile",
+          "when": "resourceScheme == file",
+          "group": "7_anchorNotes@1"
+        },
+        {
+          "command": "anchorNotes.detachFile",
+          "when": "resourceScheme == file && resourcePath in anchorNotes.fileNotePaths",
+          "group": "7_anchorNotes@2"
         }
       ]
     }

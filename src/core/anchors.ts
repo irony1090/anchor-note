@@ -67,6 +67,36 @@ export function markerAnchor(path: string, id: string | undefined): Anchor {
   return id === undefined ? { kind: "marker", path } : { kind: "marker", path, id };
 }
 
+export function fileAnchor(path: string): Anchor {
+  return { kind: "file", path };
+}
+
+// 경로 -> 그 파일에 file 앵커를 둔 라벨들 (라벨순). CodeLens·탐색기 배지·떼기가 쓴다 (REF-file-anchor)
+export function fileAnchorIndex(notes: Iterable<{ label: string; anchors: readonly Anchor[] }>): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const { label, anchors } of notes) {
+    for (const anchor of anchors) {
+      if (anchor.kind === "file") {
+        const labels = index.get(anchor.path) ?? [];
+        if (!labels.includes(label)) {
+          labels.push(label);
+        }
+        index.set(anchor.path, labels);
+      }
+    }
+  }
+  for (const labels of index.values()) {
+    labels.sort((a, b) => a.localeCompare(b));
+  }
+  return index;
+}
+
+// 이 경로의 file 앵커를 뺀다. 없으면 null. marker 앵커는 그대로 (F6 파일에서 떼기)
+export function dropFileAnchor(anchors: Anchor[], path: string): Anchor[] | null {
+  const kept = anchors.filter((anchor) => anchor.kind !== "file" || anchor.path !== path);
+  return kept.length === anchors.length ? null : kept;
+}
+
 // 이 경로·이 id의 marker 앵커인지 (id undefined = id 없는 마커)
 function isMarker(anchor: Anchor, path: string, id: string | undefined): boolean {
   return anchor.kind === "marker" && anchor.path === path && anchor.id === id;

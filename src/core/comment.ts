@@ -46,6 +46,11 @@ export interface Wrapped {
   bare: boolean;
 }
 
+// 주석 문법을 아는 언어인지. 모르면 Ctrl+Alt+M이 파일 앵커를 먼저 제안한다 (F3 주석 모르는 파일 제안)
+export function hasComment(languageId: string): boolean {
+  return COMMENTS[languageId] !== undefined;
+}
+
 // 줄 끝에 덧붙일 새 주석. 줄 주석이 있으면 줄 주석, 없으면 블록 주석
 export function wrapMarker(languageId: string, marker: string): Wrapped {
   const syntax = COMMENTS[languageId];

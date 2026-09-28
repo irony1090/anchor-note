@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   dropAnchors,
+  dropFileAnchor,
+  fileAnchor,
+  fileAnchorIndex,
   labelsInLines,
   markerAnchor,
   renameAnchors,
@@ -92,4 +95,23 @@ test("sameAnchor·sameAnchors: 종류·경로·id 비교", () => {
   assert.equal(sameAnchors([m("a.ts")], [m("a.ts")]), true);
   assert.equal(sameAnchors([m("a.ts"), m("a.ts", "x")], [m("a.ts", "x"), m("a.ts")]), false);
   assert.equal(sameAnchors([m("a.ts")], []), false);
+});
+
+test("fileAnchorIndex: file 앵커만, 경로별 라벨순, 한 메모의 같은 경로는 하나", () => {
+  const index = fileAnchorIndex([
+    { label: "b", anchors: [{ kind: "file", path: "data.json" }, { kind: "marker", path: "src/a.ts" }] },
+    { label: "a", anchors: [{ kind: "file", path: "data.json" }, { kind: "file", path: "logo.png" }, { kind: "file", path: "logo.png" }] },
+    { label: "c", anchors: [{ kind: "marker", path: "data.json" }] },
+  ]);
+  assert.deepEqual([...index], [
+    ["data.json", ["a", "b"]],
+    ["logo.png", ["a"]],
+  ]);
+});
+
+test("dropFileAnchor: 그 경로의 file 앵커만 빼고, 없으면 null", () => {
+  const anchors: Anchor[] = [{ kind: "marker", path: "a.json" }, { kind: "file", path: "a.json" }, { kind: "file", path: "b.png" }];
+  assert.deepEqual(dropFileAnchor(anchors, "a.json"), [{ kind: "marker", path: "a.json" }, { kind: "file", path: "b.png" }]);
+  assert.equal(dropFileAnchor(anchors, "c.txt"), null);
+  assert.deepEqual(fileAnchor("x.csv"), { kind: "file", path: "x.csv" });
 });
