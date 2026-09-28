@@ -17,6 +17,14 @@ test("plainText: 펜스 줄은 빼고 코드 내용은 남긴다, 라벨의 _와
   assert.equal(plainText("uart_err 처리 #esp32\n```c\nint x = 1;\n```\n끝"), "uart_err 처리 #esp32 int x = 1; 끝");
 });
 
+test("plainText: 첫 줄이 제목과 같은 머리글이면 뺀다 (빈 줄 뒤 첫 줄, 닫는 #도)", () => {
+  assert.equal(plainText("\n# 부팅 순서\n\n본문", "부팅 순서"), "본문");
+  assert.equal(plainText("## 부팅 순서 ##\n본문", "부팅 순서"), "본문");
+  assert.equal(plainText("# 다른 제목\n본문", "부팅 순서"), "다른 제목 본문");
+  assert.equal(plainText("본문\n# 부팅 순서", "부팅 순서"), "본문 부팅 순서");
+  assert.equal(plainText("# 부팅 순서\n본문"), "부팅 순서 본문");
+});
+
 test("plainText: 빈 본문은 빈 글", () => {
   assert.equal(plainText("\n\n  \n"), "");
 });

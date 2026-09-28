@@ -21,12 +21,19 @@ export interface MarkerSpot {
   character: number;
 }
 
-// 본문 -> 한 줄 글. 펜스 줄은 빼고 코드 내용은 남긴다 (코드가 메모를 구분하는 단서일 때가 많다)
-export function plainText(body: string): string {
+// 본문 -> 한 줄 글. 펜스 줄은 빼고 코드 내용은 남긴다 (코드가 메모를 구분하는 단서일 때가 많다). 첫 줄이 제목과 같은 머리글이면 뺀다 — 목록에 제목이 이미 있다
+export function plainText(body: string, title?: string): string {
   const parts: string[] = [];
+  let first = true;
   for (const { text, kind } of markdownLines(body)) {
     if (kind === "open" || kind === "close") {
       continue;
+    }
+    if (first && text.trim() !== "") {
+      first = false;
+      if (kind === "text" && title !== undefined && headingText(text) === title.trim()) {
+        continue;
+      }
     }
     const line = kind === "code" ? text : stripInline(stripBlock(text));
     if (line.trim() !== "") {
@@ -34,6 +41,12 @@ export function plainText(body: string): string {
     }
   }
   return parts.join(" ").replace(/\s+/g, " ");
+}
+
+// ATX 머리글(`# 제목 #`)의 글자. 머리글이 아니면 null
+function headingText(line: string): string | null {
+  const match = /^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$/.exec(line);
+  return match === null ? null : match[1];
 }
 
 // 줄 앞 기호: 제목·인용·목록·할 일. 가로줄·표 구분 줄·setext 밑줄은 통째로 뺀다

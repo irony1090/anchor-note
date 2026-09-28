@@ -3,13 +3,34 @@
   "displayName": "Anchor Notes",
   "description": "소스 코드에 심은 마커(@note:라벨)에 마크다운 메모를 붙인다",
   "version": "0.1.0",
-  "publisher": "irony",
+  "publisher": "irony1090",
   "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#E39B3A",
+    "theme": "light"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/irony1090/anchor-note.git"
+  },
+  "homepage": "https://github.com/irony1090/anchor-note#readme",
+  "bugs": {
+    "url": "https://github.com/irony1090/anchor-note/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "notes",
+    "memo",
+    "markdown",
+    "annotation",
+    "comments",
+    "obsidian"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -220,11 +241,13 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node test/run.mjs",
+    "package": "vsce package",
     "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.4.5"
   },

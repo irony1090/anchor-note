@@ -9,3 +9,7 @@ esbuild.mjs
 tsconfig.json
 **/*.map
 .gitignore
+media/icon.svg
+*.vsix
+examples/**
+images/**

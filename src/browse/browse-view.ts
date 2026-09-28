@@ -134,7 +134,7 @@ class BrowseViewProvider implements vscode.WebviewViewProvider {
   private notes(): BrowseNote[] {
     return this.store.labels().flatMap((label) => {
       const note = this.store.get(label);
-      return note === undefined ? [] : [{ label, title: note.meta.title, text: plainText(note.body), tags: note.tags, anchors: note.meta.anchors }];
+      return note === undefined ? [] : [{ label, title: note.meta.title, text: plainText(note.body, note.meta.title), tags: note.tags, anchors: note.meta.anchors }];
     });
   }
 
