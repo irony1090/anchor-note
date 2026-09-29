@@ -13,3 +13,4 @@ media/icon.svg
 *.vsix
 examples/**
 images/**
+.claude/**
