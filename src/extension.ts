@@ -13,6 +13,7 @@ import { registerNoteHere } from "./features/note-here";
 import { registerRename } from "./features/rename";
 import { registerTagSearch } from "./features/tag-search";
 import { registerSync } from "./markers/sync";
+import { offerMigration } from "./notes/migrate";
 import { stampOnSave } from "./notes/stamp";
 import { NoteStore } from "./notes/store";
 import { watchNotes } from "./notes/watcher";
@@ -27,7 +28,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(NoteEditorProvider.register(context, store), ...registerSync(store), ...registerFileNotes(store), ...registerCodeSync(store));
   const loaded = store.load();
   context.subscriptions.push(...registerBrowse(context, store, loaded));
-  void loaded.then(() => console.log(`[anchor-notes] activated, ${store.labels().length} notes`));
+  void loaded.then(() => {
+    console.log(`[anchor-notes] activated, ${store.labels().length} notes`);
+    return offerMigration(store);
+  });
 }
 
 export function deactivate(): void {

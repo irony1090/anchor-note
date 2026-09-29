@@ -7,8 +7,10 @@ import { tagsIn } from "../core/tag";
 import { BrokenNoteError, bodyOffset, parseNote, serializeMeta, serializeNote } from "./frontmatter";
 import type { Anchor, NoteMeta } from "./frontmatter";
 
-// 워크스페이스 첫 폴더 기준 (D8 마크다운 저장)
-export const NOTES_DIR = ".notemap/notes";
+// 워크스페이스 첫 폴더 기준 (D8 마크다운 저장). 0.1.x의 옛 폴더는 notes/migrate.ts가 옮긴다
+export const NOTES_ROOT = ".anchornotes";
+export const LEGACY_ROOT = ".notemap";
+export const NOTES_DIR = `${NOTES_ROOT}/notes`;
 const EXT = ".md";
 
 export interface Note {
@@ -45,7 +47,7 @@ export class NoteStore {
     return dir === null ? null : vscode.Uri.joinPath(dir, `${label}${EXT}`);
   }
 
-  // 저장소 폴더 바로 아래의 노트 파일이면 라벨. 하위 폴더나 다른 곳의 `.notemap`은 무시한다
+  // 저장소 폴더 바로 아래의 노트 파일이면 라벨. 하위 폴더나 다른 곳의 저장소 폴더는 무시한다
   labelOf(uri: vscode.Uri): string | null {
     const dir = this.dir;
     if (dir === null || uri.scheme !== dir.scheme || uri.authority !== dir.authority) {
@@ -402,7 +404,7 @@ function encode(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
-async function exists(uri: vscode.Uri): Promise<boolean> {
+export async function exists(uri: vscode.Uri): Promise<boolean> {
   try {
     await vscode.workspace.fs.stat(uri);
     return true;

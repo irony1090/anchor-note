@@ -246,7 +246,7 @@ export class NoteEditorProvider implements vscode.CustomTextEditorProvider {
   }
 }
 
-// 저장소 폴더 밖의 `.notemap/notes/*.md`도 이 에디터로 열린다. 그때는 파일명을 라벨로 쓴다
+// 저장소 폴더 밖의 `.anchornotes/notes/*.md`도 이 에디터로 열린다. 그때는 파일명을 라벨로 쓴다
 function fileLabel(uri: vscode.Uri): string {
   const name = uri.path.split("/").pop() ?? "";
   return name.endsWith(".md") ? name.slice(0, -3) : name;

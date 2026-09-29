@@ -1,5 +1,5 @@
 /**
- * `.notemap/notes/{라벨}.md` frontmatter 서브셋 파서 (D20 서브셋 frontmatter 파서). vscode를 import하지 않는다.
+ * `.anchornotes/notes/{라벨}.md` frontmatter 서브셋 파서 (D20 서브셋 frontmatter 파서). vscode를 import하지 않는다.
  * 모르는 키는 원문 그대로 보존하고(사람이 Obsidian에서 덧붙인 필드), 아는 키를 못 읽으면 고치지 않고 BrokenNoteError를 던진다.
  * 본문 경계는 `bodyOffset` 하나로 정한다 — 파서와 메모 에디터가 경계를 다르게 보면 본문 앞줄이 사라지거나 늘어난다.
  */

@@ -87,7 +87,7 @@ const uart_config_t cfg = { .baud_rate = 115200 };
 
 ## 저장 형식
 
-메모 하나 = `.notemap/notes/{라벨}.md` 파일 하나. git으로 같이 관리되고 Obsidian에서도 열립니다.
+메모 하나 = `.anchornotes/notes/{라벨}.md` 파일 하나. git으로 같이 관리되고 Obsidian에서도 열립니다.
 
 ```markdown
 ---
@@ -117,6 +117,11 @@ updated: 2026-09-28T10:05:00.000Z
 
 - 여러 폴더 워크스페이스에서는 첫 번째 폴더만 씁니다.
 - `git pull`처럼 VSCode 밖에서 바뀐 내용은 **마커 다시 찾기**(`Ctrl+;` `R`)로 맞춥니다.
+- 0.1.x에서 쓰던 `.notemap/` 폴더는 켤 때 `.anchornotes/`로 옮길지 묻습니다.
+
+## AI와 함께 쓰기
+
+Claude Code, Codex 같은 AI 도구와 쓸 때는 [AGENTS.md](AGENTS.md)의 내용을 프로젝트의 `CLAUDE.md` / `AGENTS.md`에 붙여 넣으세요. AI가 마커와 메모를 읽고, 동기화 범위를 깨지 않게 고칩니다.
 
 ## 개발
 

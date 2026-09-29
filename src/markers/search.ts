@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import { excludeMatcher, expandBraces } from "../core/glob";
 import { markersIn } from "../core/marker";
-import { NOTES_DIR } from "../notes/store";
+import { LEGACY_ROOT, NOTES_ROOT } from "../notes/store";
 
-const NOTEMAP_DIR = NOTES_DIR.split("/")[0];
-// package.json 기본값과 같게. 노트 저장소는 설정과 상관없이 항상 뺀다 (하위 폴더의 다른 저장소 포함)
+// package.json 기본값과 같게. 노트 저장소는 설정과 상관없이 항상 뺀다 (하위 폴더의 다른 저장소, 옮기기 전 옛 폴더 포함)
 const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**", "**/dist/**"];
-const NOTES_EXCLUDE = "**/.notemap/**";
+const NOTES_ROOTS = [NOTES_ROOT, LEGACY_ROOT];
+const NOTES_EXCLUDE = NOTES_ROOTS.map((dir) => `**/${dir}/**`);
 const MAX_BYTES = 1024 * 1024;
 const BATCH = 50;
 
@@ -26,7 +26,8 @@ export function sourcePath(uri: vscode.Uri, excluded = excludeMatcher(configured
     return null;
   }
   const path = vscode.workspace.asRelativePath(uri, false);
-  return path === NOTEMAP_DIR || path.startsWith(`${NOTEMAP_DIR}/`) || excluded(path) ? null : path;
+  const inNotes = NOTES_ROOTS.some((dir) => path === dir || path.startsWith(`${dir}/`));
+  return inNotes || excluded(path) ? null : path;
 }
 
 export interface SourceText {
@@ -44,7 +45,7 @@ export async function* sourceFiles(token?: vscode.CancellationToken): AsyncGener
   const globs = configuredExclude();
   const excluded = excludeMatcher(globs);
   // findFiles에서 먼저 빼야 node_modules 같은 큰 폴더를 목록으로 받지 않는다. 판정은 readSource의 sourcePath가 한 번 더 한다
-  const exclude = `{${[...globs.flatMap(expandBraces), NOTES_EXCLUDE].join(",")}}`;
+  const exclude = `{${[...globs.flatMap(expandBraces), ...NOTES_EXCLUDE].join(",")}}`;
   const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*"), exclude, undefined, token);
   const open = new Map(
     vscode.workspace.textDocuments.filter((doc) => !doc.isClosed).map((doc) => [doc.uri.toString(), doc] as const),
