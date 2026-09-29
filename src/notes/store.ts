@@ -82,23 +82,28 @@ export class NoteStore {
     return this.notes.get(label)?.body;
   }
 
+  // 디스크와 인덱스를 맞춘다. 켤 때와 마커 다시 찾기 때 — watcher가 놓친 변경(폴더째 삭제 등)을 여기서 거둔다
   async load(): Promise<void> {
-    this.notes.clear();
     const dir = this.dir;
-    if (dir === null) {
-      return;
+    const onDisk: vscode.Uri[] = [];
+    if (dir !== null) {
+      try {
+        for (const [name, type] of await vscode.workspace.fs.readDirectory(dir)) {
+          if (type === vscode.FileType.File) {
+            onDisk.push(vscode.Uri.joinPath(dir, name));
+          }
+        }
+      } catch {
+        // 폴더가 없다 = 메모가 없다
+      }
     }
-    let entries: Array<[string, vscode.FileType]>;
-    try {
-      entries = await vscode.workspace.fs.readDirectory(dir);
-    } catch {
-      return; // 폴더가 없다 = 메모가 없다
+    const kept = new Set(onDisk.map((uri) => this.labelOf(uri)));
+    for (const label of this.labels()) {
+      if (!kept.has(label)) {
+        this.drop(label);
+      }
     }
-    await Promise.all(
-      entries
-        .filter(([, type]) => type === vscode.FileType.File)
-        .map(([name]) => this.reload(vscode.Uri.joinPath(dir, name))),
-    );
+    await Promise.all(onDisk.map((uri) => this.reload(uri)));
   }
 
   // 파일 하나를 다시 읽는다. 없거나 깨졌으면 인덱스에서만 뺀다 — 깨진 파일은 고치지 않는다 (D20 서브셋 frontmatter 파서)

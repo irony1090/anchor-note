@@ -110,6 +110,8 @@ export function registerSync(store: NoteStore): vscode.Disposable[] {
 }
 
 async function rescanWorkspace(store: NoteStore, token: vscode.CancellationToken, quiet: boolean): Promise<void> {
+  // 메모 목록부터 디스크에 맞춘다. 없어진 메모에 앵커를 다시 쓰지 않게
+  await store.load();
   const prefix = markerPrefix();
   // 라벨 -> (경로 -> 그 파일의 이 라벨 마커 id들)
   const found = new Map<string, Map<string, MarkerIds>>();

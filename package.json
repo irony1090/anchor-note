@@ -2,7 +2,7 @@
   "name": "anchor-notes",
   "displayName": "Anchor Notes",
   "description": "코드 줄에 마크다운 메모를 붙이고, 메모 속 코드를 소스와 동기화한다 — Markdown notes anchored to code, with snippet sync",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "irony1090",
   "license": "MIT",
   "icon": "media/icon.png",

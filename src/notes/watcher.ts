@@ -10,8 +10,13 @@ export function watchNotes(store: NoteStore, onDeleted?: (label: string) => void
     return new vscode.Disposable(() => undefined);
   }
   const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, `${NOTES_DIR}/*.md`));
+  // 폴더째 지우면 VSCode가 안의 파일 이벤트를 폴더 이벤트 하나로 합친다 — 위 패턴에 안 걸리므로 폴더를 따로 보고 통째로 다시 읽는다
+  const dirs = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, `{${NOTES_DIR.split("/")[0]},${NOTES_DIR}}`), false, true, false);
   return vscode.Disposable.from(
     watcher,
+    dirs,
+    dirs.onDidCreate(() => void store.load()),
+    dirs.onDidDelete(() => void store.load()),
     watcher.onDidCreate((uri) => void store.reload(uri)),
     watcher.onDidChange((uri) => void store.reload(uri)),
     watcher.onDidDelete((uri) => {
